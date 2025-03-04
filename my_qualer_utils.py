@@ -6,10 +6,17 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from sqlalchemy import create_engine, text
+from bs4 import BeautifulSoup
+import json
 
 
 class QualerAPIFetcher:
-    def __init__(self, db_url="postgresql://postgres:postgres@192.168.1.177:5432/qualer", username=None, password=None):
+    def __init__(
+        self,
+        db_url="postgresql://postgres:postgres@192.168.1.177:5432/qualer",
+        username=None,
+        password=None,
+    ):
         """
         db_url: Full connection string to your Postgres database
         username, password: Optionally provide credentials for Qualer. If not supplied, environment
@@ -44,7 +51,7 @@ class QualerAPIFetcher:
 
     def _init_driver(self):
         chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument("--headless")
+        # chrome_options.add_argument("--headless")
         self.driver = webdriver.Chrome(options=chrome_options)
 
     def _login(self):
@@ -61,7 +68,9 @@ class QualerAPIFetcher:
             self.password = getpass("Qualer Password: ")
 
         self.driver.find_element(By.ID, "Email").send_keys(self.username)
-        self.driver.find_element(By.ID, "Password").send_keys(self.password + Keys.RETURN)
+        self.driver.find_element(By.ID, "Password").send_keys(
+            self.password + Keys.RETURN
+        )
 
         sleep(5)  # Let the page load. Increase if site is slow.
         if "login" in self.driver.current_url.lower():
@@ -75,20 +84,30 @@ class QualerAPIFetcher:
         for cookie in self.driver.get_cookies():
             self.session.cookies.set(cookie["name"], cookie["value"])
 
-    def fetch_and_store(self, url, service="QualerAPI", method="GET"):
+    def run_sql(self, sql_query, params=None):
+        """
+        Executes a SQL query against the database and returns all rows as a list of tuples.
+        """
+        with self.engine.connect() as conn:
+            result = conn.execute(text(sql_query), params or {})
+            return result.fetchall()
+
+    def fetch_and_store(self, url, service, method="GET"):
         """
         GETs the specified URL with the already-authenticated session.
         Inserts the response into `datadump` (must exist in the DB).
         """
-        if not self.session:
-            raise RuntimeError("No valid session. Did you call login() successfully?")
-        response = self.session.get(url)
+        response = self.fetch(url)
+        self.store(url, service, method, response)
+
+    def store(self, url, service, method, response):
         if response.ok:
             req_headers = dict(response.request.headers)
             res_headers = dict(response.headers)
             with self.engine.connect() as conn:
                 conn.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO datadump (
                             service, method, url,
                             request_header, request_body,
@@ -99,13 +118,35 @@ class QualerAPIFetcher:
                             :req_headers, NULL,
                             :res_headers, :res_body
                         )
-                    """),
-                    service=service,
-                    method=method,
-                    url=url,
-                    req_headers=req_headers,
-                    res_headers=res_headers,
-                    res_body=response.text
+                    """
+                    ),
+                    {
+                        "service": service,
+                        "method": method,
+                        "url": url,
+                        "req_headers": req_headers,
+                        "res_headers": res_headers,
+                        "res_body": response.text,
+                    },
                 )
         else:
-            raise RuntimeError(f"Request to {url} failed with status code {response.status_code}")
+            raise RuntimeError(
+                f"Request to {url} failed with status code {response.status_code}"
+            )
+
+    def fetch(self, url):
+        if not self.session:
+            raise RuntimeError("No valid session. Did you call login() successfully?")
+        r = self.session.get(url)
+        self.driver.get(url)
+        actual_body = self.driver.page_source
+        soup = BeautifulSoup(actual_body, "html.parser")
+        pre = soup.find("pre")
+        parsed_data = json.loads(pre.text.strip())
+        # Build a new response object with the actual body
+        new_response = requests.Response()
+        new_response.status_code = 200
+        new_response._content = json.dumps(parsed_data).encode("utf-8")
+        new_response.url = url
+        new_response.headers = r.headers
+        return new_response
