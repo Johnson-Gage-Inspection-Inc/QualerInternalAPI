@@ -9,6 +9,13 @@ from sqlalchemy import create_engine, text
 from bs4 import BeautifulSoup
 import json
 
+env_file = 'C:/Users/JGI/Jeff H/Escape Dantes Inferno/QualerInternalAPI/.env'
+if os.path.exists(env_file):
+    with open(env_file) as f:
+        for line in f:
+            key, value = line.strip().split("=")
+            os.environ[key] = value
+
 
 class QualerAPIFetcher:
     def __init__(
