@@ -13,10 +13,10 @@ with QualerAPIFetcher() as api:
     queryResult = api.run_sql(query)
     for (measurementID, batchId) in tqdm(queryResult):
         url = (
-            "https://jgiquality.qualer.com/work/Uncertainties/UncertaintyParameters?"
-            f"measurementId={measurementID}&measurementBatchId={batchId}"
+            "https://jgiquality.qualer.com/work/Uncertainties/UncertaintyModal?"
+            f"measurementId={measurementID}&MeasurementBatchId={batchId}"
         )
         try:
-            api.fetch_and_store(url, "UncertaintyParameters")
+            api.fetch_and_store(url, "UncertaintyModal")
         except Exception as e:
             print(f"Error fetching {url}: {e}")
