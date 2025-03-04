@@ -1,0 +1,39 @@
+{
+    "Success": true,
+    "Parameters": [
+      {
+        "HideParameterAbbreviation": false,
+        "ParameterAbbreviation": null,
+        "ParameterType": 3,
+        "ParameterName": "@Mean",
+        "ParameterId": 19,
+        "ValueType": 0,
+        "Value": 379.97,
+        "Text": null,
+        "DoubleArrayValue": null
+      },
+      {
+        "HideParameterAbbreviation": false,
+        "ParameterAbbreviation": null,
+        "ParameterType": 3,
+        "ParameterName": "@StdDeviation",
+        "ParameterId": 19,
+        "ValueType": 0,
+        "Value": 0.4726,
+        "Text": null,
+        "DoubleArrayValue": null
+      },
+      {
+        "HideParameterAbbreviation": false,
+        "ParameterAbbreviation": null,
+        "ParameterType": 0,
+        "ParameterName": null,
+        "ParameterId": 19,
+        "ValueType": 0,
+        "Value": 400,
+        "Text": null,
+        "DoubleArrayValue": null
+      }
+    ],
+    "MuParameters": []
+  }
