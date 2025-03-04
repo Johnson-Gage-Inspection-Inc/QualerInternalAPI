@@ -7,8 +7,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from sqlalchemy import create_engine, text
 
+
 class QualerAPIFetcher:
-    def __init__(self, db_url, username=None, password=None):
+    def __init__(self, db_url="postgresql://postgres:postgres@192.168.1.177:5432/qualer", username=None, password=None):
         """
         db_url: Full connection string to your Postgres database
         username, password: Optionally provide credentials for Qualer. If not supplied, environment
