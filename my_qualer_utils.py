@@ -21,6 +21,7 @@ class QualerAPIFetcher:
     def __init__(
         self,
         db_url="postgresql://postgres:postgres@192.168.1.177:5432/qualer",
+        headless=True,
         username=None,
         password=None,
     ):
@@ -33,6 +34,7 @@ class QualerAPIFetcher:
         self.username = username or os.getenv("QUALER_USERNAME")
         self.password = password or os.getenv("QUALER_PASSWORD")
         self.driver = None
+        self.headless = headless
         self.session = None
         self.engine = None
 
@@ -58,7 +60,8 @@ class QualerAPIFetcher:
 
     def _init_driver(self):
         chrome_options = webdriver.ChromeOptions()
-        chrome_options.add_argument("--headless")
+        if self.headless:
+            chrome_options.add_argument("--headless")
         self.driver = webdriver.Chrome(options=chrome_options)
 
     def _login(self):
