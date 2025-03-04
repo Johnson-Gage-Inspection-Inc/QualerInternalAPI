@@ -120,6 +120,7 @@ class QualerAPIFetcher:
                             :req_headers, NULL,
                             :res_headers, :res_body
                         )
+                        ON CONFLICT DO NOTHING;
                     """
                     ),
                     {
@@ -140,10 +141,14 @@ class QualerAPIFetcher:
         if not self.session:
             raise RuntimeError("No valid session. Did you call login() successfully?")
         r = self.session.get(url)
+        r.raise_for_status()
+        # Selenium is needed to get the response body
         self.driver.get(url)
         actual_body = self.driver.page_source
         soup = BeautifulSoup(actual_body, "html.parser")
         pre = soup.find("pre")
+        if not pre:
+            raise RuntimeError("Couldn't find <pre> tag in response body")
         parsed_data = json.loads(pre.text.strip())
         # Build a new response object with the actual body
         new_response = requests.Response()
