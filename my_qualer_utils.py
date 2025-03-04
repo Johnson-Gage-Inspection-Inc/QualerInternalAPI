@@ -51,7 +51,7 @@ class QualerAPIFetcher:
 
     def _init_driver(self):
         chrome_options = webdriver.ChromeOptions()
-        # chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--headless")
         self.driver = webdriver.Chrome(options=chrome_options)
 
     def _login(self):
