@@ -101,10 +101,12 @@ class QualerAPIFetcher:
         self.store(url, service, method, response)
 
     def store(self, url, service, method, response):
+        if not response.text:
+            raise RuntimeError("Response body is empty. Did the request fail?")
         if response.ok:
             req_headers = dict(response.request.headers)
             res_headers = dict(response.headers)
-            with self.engine.connect() as conn:
+            with self.engine.begin() as conn:
                 conn.execute(
                     text(
                         """
@@ -149,4 +151,5 @@ class QualerAPIFetcher:
         new_response._content = json.dumps(parsed_data).encode("utf-8")
         new_response.url = url
         new_response.headers = r.headers
+        new_response.request = r.request
         return new_response
