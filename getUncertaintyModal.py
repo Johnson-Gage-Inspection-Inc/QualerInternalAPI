@@ -11,7 +11,7 @@ with QualerAPIFetcher() as api:
     LIMIT 10;
 """
     queryResult = api.run_sql(query)
-    for (measurementID, batchId) in tqdm(queryResult):
+    for (measurementID, batchId) in tqdm(queryResult, dynamic_ncols=True):
         url = (
             "https://jgiquality.qualer.com/work/Uncertainties/UncertaintyModal?"
             f"measurementId={measurementID}&MeasurementBatchId={batchId}"
