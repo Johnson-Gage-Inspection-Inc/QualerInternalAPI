@@ -1,0 +1,497 @@
+[
+    {
+        "Text": "Absorbance",
+        "Value": "8",
+        "Selected": false
+    },
+    {
+        "Text": "Acceleration",
+        "Value": "42",
+        "Selected": false
+    },
+    {
+        "Text": "Amount of Substance",
+        "Value": "38",
+        "Selected": false
+    },
+    {
+        "Text": "Amplitude",
+        "Value": "66",
+        "Selected": false
+    },
+    {
+        "Text": "Angle",
+        "Value": "40",
+        "Selected": false
+    },
+    {
+        "Text": "Angular Acceleration",
+        "Value": "43",
+        "Selected": false
+    },
+    {
+        "Text": "Angular Velocity",
+        "Value": "41",
+        "Selected": false
+    },
+    {
+        "Text": "Arbitrary Units",
+        "Value": "62",
+        "Selected": false
+    },
+    {
+        "Text": "Area",
+        "Value": "37",
+        "Selected": false
+    },
+    {
+        "Text": "Atomic Mass",
+        "Value": "173",
+        "Selected": false
+    },
+    {
+        "Text": "Concentration",
+        "Value": "7",
+        "Selected": false
+    },
+    {
+        "Text": "Current Density",
+        "Value": "58",
+        "Selected": false
+    },
+    {
+        "Text": "Dewpoint",
+        "Value": "143",
+        "Selected": false
+    },
+    {
+        "Text": "Dilution Ratio",
+        "Value": "150",
+        "Selected": false
+    },
+    {
+        "Text": "Duty Cycle",
+        "Value": "151",
+        "Selected": false
+    },
+    {
+        "Text": "Dynamic Viscosity",
+        "Value": "46",
+        "Selected": false
+    },
+    {
+        "Text": "Electric Charge",
+        "Value": "48",
+        "Selected": false
+    },
+    {
+        "Text": "Electric Field Strength",
+        "Value": "49",
+        "Selected": false
+    },
+    {
+        "Text": "Electric Potential / Voltage",
+        "Value": "11",
+        "Selected": false
+    },
+    {
+        "Text": "Electrical Conductance",
+        "Value": "61",
+        "Selected": false
+    },
+    {
+        "Text": "Electrical Conductivity",
+        "Value": "28",
+        "Selected": false
+    },
+    {
+        "Text": "Electrical Current",
+        "Value": "25",
+        "Selected": false
+    },
+    {
+        "Text": "Electrical Resistivity",
+        "Value": "27",
+        "Selected": false
+    },
+    {
+        "Text": "Electrostatic Capacitance",
+        "Value": "29",
+        "Selected": false
+    },
+    {
+        "Text": "Energy Density",
+        "Value": "165",
+        "Selected": false
+    },
+    {
+        "Text": "Flow Velocity",
+        "Value": "14",
+        "Selected": false
+    },
+    {
+        "Text": "Fluorescence",
+        "Value": "36",
+        "Selected": false
+    },
+    {
+        "Text": "Force",
+        "Value": "44",
+        "Selected": false
+    },
+    {
+        "Text": "Frequency",
+        "Value": "30",
+        "Selected": false
+    },
+    {
+        "Text": "Frequency Ratio",
+        "Value": "163",
+        "Selected": false
+    },
+    {
+        "Text": "Gravimetric Volume",
+        "Value": "12",
+        "Selected": false
+    },
+    {
+        "Text": "Hardness",
+        "Value": "65",
+        "Selected": false
+    },
+    {
+        "Text": "Harmonic Distortion",
+        "Value": "145",
+        "Selected": false
+    },
+    {
+        "Text": "Illuminance",
+        "Value": "16",
+        "Selected": false
+    },
+    {
+        "Text": "Inductance",
+        "Value": "51",
+        "Selected": false
+    },
+    {
+        "Text": "Irradiance",
+        "Value": "172",
+        "Selected": false
+    },
+    {
+        "Text": "Kinematic Viscosity",
+        "Value": "45",
+        "Selected": false
+    },
+    {
+        "Text": "Length / Dimension",
+        "Value": "32",
+        "Selected": false
+    },
+    {
+        "Text": "Light Density",
+        "Value": "139",
+        "Selected": false
+    },
+    {
+        "Text": "Luminance",
+        "Value": "55",
+        "Selected": false
+    },
+    {
+        "Text": "Luminous Flux",
+        "Value": "54",
+        "Selected": false
+    },
+    {
+        "Text": "Luminous Intensity",
+        "Value": "15",
+        "Selected": false
+    },
+    {
+        "Text": "Magnetic Field Strength",
+        "Value": "53",
+        "Selected": false
+    },
+    {
+        "Text": "Magnetic Flux",
+        "Value": "50",
+        "Selected": false
+    },
+    {
+        "Text": "Magnetic Flux Density",
+        "Value": "52",
+        "Selected": false
+    },
+    {
+        "Text": "Magnification",
+        "Value": "170",
+        "Selected": false
+    },
+    {
+        "Text": "Mass",
+        "Value": "33",
+        "Selected": false
+    },
+    {
+        "Text": "Mass Density",
+        "Value": "57",
+        "Selected": false
+    },
+    {
+        "Text": "Mass Flow",
+        "Value": "64",
+        "Selected": false
+    },
+    {
+        "Text": "Mass-To-Charge Ratio",
+        "Value": "171",
+        "Selected": false
+    },
+    {
+        "Text": "Optical Flatness",
+        "Value": "155",
+        "Selected": false
+    },
+    {
+        "Text": "Osmolality",
+        "Value": "34",
+        "Selected": false
+    },
+    {
+        "Text": "Osmolarity",
+        "Value": "35",
+        "Selected": false
+    },
+    {
+        "Text": "Particle Number",
+        "Value": "147",
+        "Selected": false
+    },
+    {
+        "Text": "Particle Size",
+        "Value": "148",
+        "Selected": false
+    },
+    {
+        "Text": "pH / Acidicity / Alkalinity",
+        "Value": "13",
+        "Selected": false
+    },
+    {
+        "Text": "Phase",
+        "Value": "160",
+        "Selected": false
+    },
+    {
+        "Text": "Porosity",
+        "Value": "166",
+        "Selected": false
+    },
+    {
+        "Text": "Power",
+        "Value": "142",
+        "Selected": false
+    },
+    {
+        "Text": "Power Factor",
+        "Value": "157",
+        "Selected": false
+    },
+    {
+        "Text": "Power Spectral Density",
+        "Value": "146",
+        "Selected": false
+    },
+    {
+        "Text": "Pressure",
+        "Value": "3",
+        "Selected": false
+    },
+    {
+        "Text": "Pressure/Amperage",
+        "Value": "168",
+        "Selected": false
+    },
+    {
+        "Text": "Pulse Measurement",
+        "Value": "154",
+        "Selected": false
+    },
+    {
+        "Text": "Rate",
+        "Value": "71",
+        "Selected": false
+    },
+    {
+        "Text": "Reactive Power",
+        "Value": "141",
+        "Selected": false
+    },
+    {
+        "Text": "Refraction",
+        "Value": "140",
+        "Selected": false
+    },
+    {
+        "Text": "Relative Humidity",
+        "Value": "10",
+        "Selected": false
+    },
+    {
+        "Text": "Relative Units",
+        "Value": "63",
+        "Selected": false
+    },
+    {
+        "Text": "Relative Units",
+        "Value": "164",
+        "Selected": false
+    },
+    {
+        "Text": "Resistance / Impedance",
+        "Value": "26",
+        "Selected": false
+    },
+    {
+        "Text": "Rotational Speed",
+        "Value": "60",
+        "Selected": false
+    },
+    {
+        "Text": "Slope",
+        "Value": "67",
+        "Selected": false
+    },
+    {
+        "Text": "Sound Loudness / Intensity",
+        "Value": "17",
+        "Selected": false
+    },
+    {
+        "Text": "Specular Reflection",
+        "Value": "70",
+        "Selected": false
+    },
+    {
+        "Text": "Speed / Velocity",
+        "Value": "24",
+        "Selected": false
+    },
+    {
+        "Text": "Stiffness",
+        "Value": "167",
+        "Selected": false
+    },
+    {
+        "Text": "Substance Concentration",
+        "Value": "59",
+        "Selected": false
+    },
+    {
+        "Text": "Surface Roughness",
+        "Value": "68",
+        "Selected": false
+    },
+    {
+        "Text": "Tan Delta",
+        "Value": "159",
+        "Selected": false
+    },
+    {
+        "Text": "Temperature",
+        "Value": "1",
+        "Selected": false
+    },
+    {
+        "Text": "Thickness",
+        "Value": "153",
+        "Selected": false
+    },
+    {
+        "Text": "Time",
+        "Value": "6",
+        "Selected": false
+    },
+    {
+        "Text": "Torque",
+        "Value": "9",
+        "Selected": false
+    },
+    {
+        "Text": "Transmittance",
+        "Value": "144",
+        "Selected": false
+    },
+    {
+        "Text": "Turbidity",
+        "Value": "69",
+        "Selected": false
+    },
+    {
+        "Text": "Turns Ratios",
+        "Value": "158",
+        "Selected": false
+    },
+    {
+        "Text": "Vacuum",
+        "Value": "169",
+        "Selected": false
+    },
+    {
+        "Text": "Vibration",
+        "Value": "156",
+        "Selected": false
+    },
+    {
+        "Text": "Vital Sign",
+        "Value": "152",
+        "Selected": false
+    },
+    {
+        "Text": "Voltage Ratio",
+        "Value": "72",
+        "Selected": false
+    },
+    {
+        "Text": "Volume",
+        "Value": "4",
+        "Selected": false
+    },
+    {
+        "Text": "Volumetric Flow",
+        "Value": "149",
+        "Selected": false
+    },
+    {
+        "Text": "Wattage",
+        "Value": "31",
+        "Selected": false
+    },
+    {
+        "Text": "Wave Number",
+        "Value": "56",
+        "Selected": false
+    },
+    {
+        "Text": "Wavelength",
+        "Value": "21",
+        "Selected": false
+    },
+    {
+        "Text": "Weight",
+        "Value": "2",
+        "Selected": false
+    },
+    {
+        "Text": "Weight Density",
+        "Value": "5",
+        "Selected": false
+    },
+    {
+        "Text": "Work / Energy",
+        "Value": "47",
+        "Selected": false
+    }
+]
