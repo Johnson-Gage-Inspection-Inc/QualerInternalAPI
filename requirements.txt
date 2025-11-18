@@ -1,4 +1,5 @@
 bs4
+pandas
 selenium
 sqlalchemy
 tqdm
