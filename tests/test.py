@@ -1,7 +1,7 @@
 # test_uncertainty.py
 
 import pytest
-from my_qualer_utils import QualerAPIFetcher
+from utils.auth import QualerAPIFetcher
 import json
 
 
