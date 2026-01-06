@@ -30,12 +30,15 @@ class QualerAPIFetcher:
         headless: bool = True,
         username: Optional[str] = None,
         password: Optional[str] = None,
+        login_wait_time: float = 5.0,
     ):
         """
         db_url: Full connection string to your Postgres database
         username, password: Optionally provide credentials for Qualer. If not
                            supplied, environment variables or interactive prompts
                            will be used.
+        login_wait_time: Seconds to wait after login for page to load
+                        (configurable via QUALER_LOGIN_WAIT_TIME env var)
         """
         if not db_url:
             db_url = os.getenv("DB_URL")
@@ -48,6 +51,7 @@ class QualerAPIFetcher:
         self.headless = headless
         self.session = None
         self.engine = None
+        self.login_wait_time = float(os.getenv("QUALER_LOGIN_WAIT_TIME", login_wait_time))
 
     def __enter__(self):
         """
@@ -66,6 +70,9 @@ class QualerAPIFetcher:
         if self.driver:
             self.driver.quit()
             self.driver = None
+        if self.engine:
+            self.engine.dispose()
+            self.engine = None
 
     def _init_driver(self):
         """Initialize Chrome WebDriver."""
@@ -96,7 +103,7 @@ class QualerAPIFetcher:
         self.driver.find_element(By.ID, "Email").send_keys(self.username)
         self.driver.find_element(By.ID, "Password").send_keys(self.password + Keys.RETURN)
 
-        sleep(5)  # Let the page load. Increase if site is slow.
+        sleep(self.login_wait_time)  # Wait for page load
         if "login" in self.driver.current_url.lower():
             raise RuntimeError("Login failed. Check your credentials.")
 

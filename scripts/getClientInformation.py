@@ -1,4 +1,6 @@
+import sys
 import json
+import os
 from typing import Any, Dict, Optional
 
 import requests
@@ -31,10 +33,7 @@ def get_client_information(
     Raises:
         requests.exceptions.RequestException: If the API request fails
     """
-    url = (
-        "https://jgiquality.qualer.com/Client/"
-        f"ClientInformation?clientId={client_id}"
-    )
+    url = "https://jgiquality.qualer.com/Client/" f"ClientInformation?clientId={client_id}"
 
     headers = {
         "accept": "text/html, */*; q=0.01",
@@ -47,9 +46,7 @@ def get_client_information(
             f"https://jgiquality.qualer.com/client/account?"
             f"clientId={client_id}&startFilter=CompanyInformation"
         ),
-        "sec-ch-ua": (
-            '"Google Chrome";v="143", "Chromium";v="143", ' '"Not A(Brand";v="24"'
-        ),
+        "sec-ch-ua": ('"Google Chrome";v="143", "Chromium";v="143", ' '"Not A(Brand";v="24"'),
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
         "sec-fetch-dest": "empty",
@@ -69,7 +66,8 @@ def get_client_information(
             session.cookies.update(cookies)
 
     try:
-        response = session.get(url, headers=headers, timeout=10)
+        timeout = float(os.getenv("QUALER_REQUEST_TIMEOUT", "30"))
+        response = session.get(url, headers=headers, timeout=timeout)
         response.raise_for_status()  # Raise exception for bad status codes
 
         # Parse HTML response
@@ -127,9 +125,7 @@ def get_client_information_with_auth(
     """
     from utils.auth import QualerAPIFetcher
 
-    with QualerAPIFetcher(
-        username=username, password=password, headless=headless
-    ) as fetcher:
+    with QualerAPIFetcher(username=username, password=password, headless=headless) as fetcher:
         return get_client_information(client_id, session=fetcher.session)
 
 
@@ -140,14 +136,12 @@ if __name__ == "__main__":
         clients = json.load(f)
     if not clients:
         print("No clients found")
-        exit(1)
+        sys.exit(1)
 
     data_list = []
     client_ids: list[int] = [c["Id"] for c in clients["Data"] if c.get("Id")]
     with QualerAPIFetcher(headless=False) as fetcher:
-        for client_id in tqdm(
-            client_ids, desc="Fetching client information", dynamic_ncols=True
-        ):
+        for client_id in tqdm(client_ids, desc="Fetching client information", dynamic_ncols=True):
             try:
                 data = get_client_information(client_id, session=fetcher.session)
                 data_list.append(data)

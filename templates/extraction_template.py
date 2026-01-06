@@ -11,7 +11,9 @@ Workflow:
 7. Copy this template and fill in the blanks below
 """
 
+import sys
 import json
+import os
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -42,10 +44,7 @@ def get_entity_information(
         requests.exceptions.RequestException: If the API request fails
     """
     # TODO: Replace with actual endpoint from Chrome Network inspector
-    url = (
-        "https://jgiquality.qualer.com/Entity/"
-        f"EntityInformation?entityId={entity_id}"
-    )
+    url = "https://jgiquality.qualer.com/Entity/" f"EntityInformation?entityId={entity_id}"
 
     headers = {
         "accept": "text/html, */*; q=0.01",
@@ -54,12 +53,8 @@ def get_entity_information(
         "cache-control": "no-cache, must-revalidate",
         "pragma": "no-cache",
         "priority": "u=1, i",
-        "referer": (
-            f"https://jgiquality.qualer.com/entity/account?" f"entityId={entity_id}"
-        ),
-        "sec-ch-ua": (
-            '"Google Chrome";v="143", "Chromium";v="143", ' '"Not A(Brand";v="24"'
-        ),
+        "referer": (f"https://jgiquality.qualer.com/entity/account?" f"entityId={entity_id}"),
+        "sec-ch-ua": ('"Google Chrome";v="143", "Chromium";v="143", ' '"Not A(Brand";v="24"'),
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"Windows"',
         "sec-fetch-dest": "empty",
@@ -83,7 +78,8 @@ def get_entity_information(
 
     try:
         # TODO: Change to session.post() if needed, add json=request_body
-        response = session.get(url, headers=headers, timeout=10)
+        timeout = float(os.getenv("QUALER_REQUEST_TIMEOUT", "30"))
+        response = session.get(url, headers=headers, timeout=timeout)
         response.raise_for_status()
 
         # Parse HTML response
@@ -122,7 +118,7 @@ if __name__ == "__main__":
 
     if not entities:
         print("No entities found")
-        exit(1)
+        sys.exit(1)
 
     data_list: List[Dict[str, Any]] = []
     # TODO: Update to match actual data structure
