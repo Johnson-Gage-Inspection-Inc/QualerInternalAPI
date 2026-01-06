@@ -128,10 +128,20 @@ EXAMPLE_COOKIES = {
 
 
 if __name__ == "__main__":
-    # Example usage with authentication cookies
-    client_id = 152226
-    try:
-        data = get_client_information(client_id, cookies=EXAMPLE_COOKIES)
-        print(json.dumps(data, indent=2))
-    except Exception as e:
-        print(f"Failed to get client information: {e}")
+    from integrations.qualer_sdk.client import make_qualer_client
+    from qualer_sdk.api.clients import get_all_get_2
+
+    qualer_client = make_qualer_client()
+
+    clients = get_all_get_2.sync(client=qualer_client)
+    if not clients:
+        print("No clients found")
+        exit(1)
+
+    client_ids: list[int] = [c.company_id for c in clients if c.company_id]
+    for client_id in client_ids:
+        try:
+            data = get_client_information(client_id, cookies=EXAMPLE_COOKIES)
+            print(json.dumps(data, indent=2))
+        except Exception as e:
+            print(f"Failed to get client information: {e}")
