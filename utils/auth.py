@@ -124,8 +124,44 @@ class QualerAPIFetcher:
 
     def fetch_and_store(self, url, service, method="GET"):
         """Fetch URL and insert response into datadump table."""
-        response = self.fetch(url)
-        self.store(url, service, method, response)
+        if not self.driver or not self.session:
+            raise RuntimeError("Driver or session not initialized")
+
+        # First, get response headers from requests to check Content-Type
+        r = self.session.get(url)
+        content_type = r.headers.get("Content-Type", "").lower()
+
+        # Use Selenium to get the actual response body (handles JavaScript-rendered content)
+        self.driver.get(url)
+        response_body = self.driver.page_source
+
+        # If JSON response, try to extract from <pre> tag; otherwise store raw HTML
+        if "application/json" == content_type or "json" in content_type:
+            soup = BeautifulSoup(response_body, "html.parser")
+            pre = soup.find("pre")
+            if pre:
+                response_body = pre.text.strip()
+
+        # Store response to database
+        assert self.engine is not None
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO datadump (url, service, method, request_header, response_body, response_header)
+                    VALUES (:url, :service, :method, :req_headers, :res_body, :res_headers)
+                    ON CONFLICT DO NOTHING
+                    """
+                ),
+                {
+                    "url": url,
+                    "service": service,
+                    "method": method,
+                    "req_headers": dict(r.request.headers) if r.request else {},
+                    "res_body": response_body,
+                    "res_headers": dict(r.headers),
+                },
+            )
 
     def store(self, url, service, method, response):
         """Store request/response in database."""
