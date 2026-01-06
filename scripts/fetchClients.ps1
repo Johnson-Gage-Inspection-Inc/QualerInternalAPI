@@ -39,4 +39,4 @@ Invoke-WebRequest -UseBasicParsing -Uri "https://jgiquality.qualer.com/ClientDas
 } `
 -ContentType "application/x-www-form-urlencoded; charset=UTF-8" `
 -Body "sort=ClientCompanyName-asc&page=1&pageSize=1000000&group=&filter=&search=&filterType=AllClients&__RequestVerificationToken=tUVqA_gNGpID33vH4BpXjO3UB4_RwVPX0TJYes3IDDTriiWpV4KsmNmvQIHwryTcdtTqzyMNBhnJNeLGUf2GFTi7b1iLXRZGfd6eqjcwEXcAr1Zx0" `
--OutFile "clients.json"
+-OutFile "data/clients.json"
