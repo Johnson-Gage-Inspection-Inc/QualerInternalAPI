@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qualer_internal_api"
+version = "0.1.0"
+description = "Python data extraction pipeline for Qualer quality management system"
+requires-python = ">=3.8"
+dependencies = [
+    "beautifulsoup4",
+    "pandas",
+    "selenium",
+    "sqlalchemy",
+    "tqdm",
+    "requests",
+    "python-dotenv",
+    "psycopg2-binary",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["utils", "qualer_internal_sdk*"]
+
+[tool.black]
+line-length = 100
+
+[tool.flake8]
+ignore = ["E501"]  # Line too long
+
+[tool.mypy]
+ignore_missing_imports = true
