@@ -114,7 +114,7 @@ def get_entity_information(
 
 
 if __name__ == "__main__":
-    from my_qualer_utils import QualerAPIFetcher
+    from utils.auth import QualerAPIFetcher
 
     # TODO: Update with actual data source
     with open("entities.json", "r", encoding="utf-8") as f:

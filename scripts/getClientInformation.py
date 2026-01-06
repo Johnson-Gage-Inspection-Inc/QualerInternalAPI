@@ -134,7 +134,7 @@ def get_client_information_with_auth(
 
 
 if __name__ == "__main__":
-    from my_qualer_utils import QualerAPIFetcher
+    from utils.auth import QualerAPIFetcher
 
     with open("clients.json", "r", encoding="utf-8") as f:
         clients = json.load(f)
