@@ -4,3 +4,4 @@ selenium
 sqlalchemy
 tqdm
 requests
+beautifulsoup4

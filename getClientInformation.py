@@ -2,14 +2,15 @@ import json
 from typing import Any, Dict, Optional
 
 import requests
+from bs4 import BeautifulSoup
 
 
 def get_client_information(
     client_id: int,
     cookies: Optional[Dict[str, str]] = None,
-) -> Dict[str, Any] | str:
+) -> Dict[str, Any]:
     """
-    Fetch client information from Qualer API.
+    Fetch client information from Qualer API and parse the HTML response.
 
     Requires authentication cookies from an active Qualer session.
     See EXAMPLE_COOKIES variable below for the required cookies.
@@ -20,7 +21,7 @@ def get_client_information(
                  to use default cookies.
 
     Returns:
-        Dictionary containing the client information response
+        Dictionary containing the parsed client information
 
     Raises:
         requests.exceptions.RequestException: If the API request fails
@@ -64,14 +65,30 @@ def get_client_information(
     try:
         response = session.get(url, headers=headers, timeout=10)
         response.raise_for_status()  # Raise exception for bad status codes
-        try:
-            return response.json()
-        except json.JSONDecodeError:
-            # Response is not JSON, print it for debugging
-            print("Response is not JSON. Status Code:", response.status_code)
-            print("Response Text (first 500 chars):")
-            print(response.text[:500])
-            return response.text
+
+        # Parse HTML response
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Extract all form input values
+        client_data: Dict[str, Any] = {}
+        form = soup.find("form", {"id": "ClientInformation"})
+
+        if form:
+            # Extract all input fields
+            for input_field in form.find_all("input"):
+                name = input_field.get("name")
+                value = input_field.get("value", "")
+
+                if name and isinstance(name, str):
+                    client_data[name] = value
+
+        if not client_data:
+            # If no form found, return raw text for debugging
+            print("Warning: Could not find ClientInformation form")
+            return {"raw_response": response.text[:1000]}
+
+        return client_data
+
     except requests.exceptions.RequestException as e:
         print(f"Error fetching client information: {e}")
         raise
