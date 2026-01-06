@@ -10,14 +10,9 @@ from selenium.webdriver.common.keys import Keys
 from sqlalchemy import create_engine, text
 from bs4 import BeautifulSoup
 import json
+from dotenv import load_dotenv
 
-
-env_file = "C:/Users/JGI/Jeff H/Escape Dantes Inferno/QualerInternalAPI/.env"
-if os.path.exists(env_file):
-    with open(env_file) as f:
-        for line in f:
-            key, value = line.strip().split("=")
-            os.environ[key] = value
+load_dotenv()
 
 
 class QualerAPIFetcher:
@@ -90,9 +85,7 @@ class QualerAPIFetcher:
             self.password = getpass("Qualer Password: ")
 
         self.driver.find_element(By.ID, "Email").send_keys(self.username)
-        self.driver.find_element(By.ID, "Password").send_keys(
-            self.password + Keys.RETURN
-        )
+        self.driver.find_element(By.ID, "Password").send_keys(self.password + Keys.RETURN)
 
         sleep(5)  # Let the page load. Increase if site is slow.
         if "login" in self.driver.current_url.lower():
@@ -152,9 +145,7 @@ class QualerAPIFetcher:
                     },
                 )
         else:
-            raise RuntimeError(
-                f"Request to {url} failed with status code {response.status_code}"
-            )
+            raise RuntimeError(f"Request to {url} failed with status code {response.status_code}")
 
     def fetch(self, url):
         """Fetch URL using authenticated session."""
