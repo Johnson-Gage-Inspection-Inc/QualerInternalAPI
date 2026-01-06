@@ -124,3 +124,47 @@ client_data.csv                # Output: CSV export
 4. Parse HTML with BeautifulSoup (extract form ID, input fields)
 5. Output JSON + CSV for each entity
 6. Add unit tests in `tests/test_get<Entity>.py` mocking HTTP calls
+
+## Workflow for Discovering New Endpoints
+
+This repo is a sandbox for reverse-engineering Qualer's internal API (not documented in their SDK). Use this workflow:
+
+1. **Navigate to Qualer UI** - Find the page with desired data at `https://jgiquality.qualer.com`
+2. **Open Chrome DevTools** - Press F12, go to **Network** tab
+3. **Capture the request** - Perform the action, find the Fetch/XHR request in Network
+4. **Copy the request** - Right-click request → **Copy as** → fetch/cURL/PowerShell
+5. **Extract key info**:
+   - URL (endpoint + query params)
+   - HTTP method (GET/POST/etc)
+   - Headers (referer, x-requested-with, etc)
+   - Request body (if POST)
+   - Response type (JSON vs HTML form)
+6. **Use the template** - Copy `templates/extraction_template.py` and fill in the blanks
+7. **Update script** - Replace TODO comments with actual endpoint details
+8. **Test locally** - Run with `headless=False` to see browser during auth
+
+## Template Usage Example
+
+```bash
+# Copy template
+cp templates/extraction_template.py scripts/get_new_entity.py
+
+# Edit script:
+# - Replace "entity_information" with your endpoint
+# - Update form ID (from DevTools HTML response)
+# - Update file names (entities.json, entity_data.json)
+# - Update data structure path (if JSON response differs)
+
+# Run with authentication
+python scripts/get_new_entity.py
+```
+
+## Repository Organization Strategy
+
+See `docs/REPO_ORGANIZATION.md` for the plan to scale this towards a unified internal API SDK. Key structure:
+
+- `scripts/` - Individual extraction scripts (use template)
+- `qualer_internal_sdk/endpoints/` - Reusable parsing modules (future)
+- `utils/` - Shared auth, HTML parsing, output utilities
+- `templates/` - Template script and workflow docs
+- `docs/API_MAPPING.md` - Track discovered endpoints (TBD)
