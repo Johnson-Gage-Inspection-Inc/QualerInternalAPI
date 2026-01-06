@@ -125,7 +125,7 @@ def get_client_information_with_auth(
         RuntimeError: If authentication fails
         requests.exceptions.RequestException: If the API request fails
     """
-    from my_qualer_utils import QualerAPIFetcher
+    from utils.auth import QualerAPIFetcher
 
     with QualerAPIFetcher(
         username=username, password=password, headless=headless
