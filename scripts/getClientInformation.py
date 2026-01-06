@@ -4,9 +4,10 @@ import os
 from typing import Any, Dict, Optional
 
 import requests
-from bs4 import BeautifulSoup
 import pandas as pd
 from tqdm import tqdm
+
+from utils.html_parser import extract_form_fields_safe
 
 
 def get_client_information(
@@ -70,26 +71,8 @@ def get_client_information(
         response = session.get(url, headers=headers, timeout=timeout)
         response.raise_for_status()  # Raise exception for bad status codes
 
-        # Parse HTML response
-        soup = BeautifulSoup(response.text, "html.parser")
-
-        # Extract all form input values
-        client_data: Dict[str, Any] = {}
-        form = soup.find("form", {"id": "ClientInformation"})
-
-        if form:
-            # Extract all input fields
-            for input_field in form.find_all("input"):
-                name = input_field.get("name")
-                value = input_field.get("value", "")
-
-                if name and isinstance(name, str):
-                    client_data[name] = value
-
-        if not client_data:
-            # If no form found, return raw text for debugging
-            print("Warning: Could not find ClientInformation form")
-            return {"raw_response": response.text[:1000]}
+        # Parse HTML response and extract form fields
+        client_data = extract_form_fields_safe(response.text, "ClientInformation")
 
         return client_data
 
@@ -132,7 +115,7 @@ def get_client_information_with_auth(
 if __name__ == "__main__":
     from utils.auth import QualerAPIFetcher
 
-    with open("clients.json", "r", encoding="utf-8") as f:
+    with open("local/clients.json", "r", encoding="utf-8") as f:
         clients = json.load(f)
     if not clients:
         print("No clients found")
@@ -155,9 +138,9 @@ if __name__ == "__main__":
                 print(f"Failed to get client {client_id}: {e}")
 
     # Optionally, store all client data to a JSON file
-    with open("client_account_data.json", "w", encoding="utf-8") as outfile:
+    with open("local/client_account_data.json", "w", encoding="utf-8") as outfile:
         json.dump(data_list, outfile, indent=2)
 
     # Also, flatten and store to CSV
     df = pd.json_normalize(data_list)
-    df.to_csv("client_account_data.csv", index=False)
+    df.to_csv("local/client_account_data.csv", index=False)
