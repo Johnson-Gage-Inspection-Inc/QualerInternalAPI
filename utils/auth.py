@@ -1,6 +1,7 @@
 """Authentication utilities for Qualer API access."""
 
 import os
+from typing import Optional
 import requests
 from time import sleep
 from getpass import getpass
@@ -25,10 +26,10 @@ class QualerAPIFetcher:
 
     def __init__(
         self,
-        db_url="postgresql://postgres:postgres@192.168.1.177:5432/qualer",
-        headless=True,
-        username=None,
-        password=None,
+        db_url: Optional[str] = None,
+        headless: bool = True,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
     ):
         """
         db_url: Full connection string to your Postgres database
@@ -36,6 +37,10 @@ class QualerAPIFetcher:
                            supplied, environment variables or interactive prompts
                            will be used.
         """
+        if not db_url:
+            db_url = os.getenv("DB_URL")
+        if not db_url:
+            raise EnvironmentError("DB_URL environment variable is not set")
         self.db_url = db_url
         self.username = username or os.getenv("QUALER_USERNAME")
         self.password = password or os.getenv("QUALER_PASSWORD")
@@ -83,6 +88,10 @@ class QualerAPIFetcher:
             self.username = input("Qualer Username: ")
         if not self.password:
             self.password = getpass("Qualer Password: ")
+
+        # By now, username and password must be set
+        assert self.username is not None
+        assert self.password is not None
 
         self.driver.find_element(By.ID, "Email").send_keys(self.username)
         self.driver.find_element(By.ID, "Password").send_keys(self.password + Keys.RETURN)
