@@ -161,9 +161,9 @@ if __name__ == "__main__":
                 print(f"Failed to get client {client_id}: {e}")
 
     # Optionally, store all client data to a JSON file
-    with open("client_data.json", "w", encoding="utf-8") as outfile:
+    with open("client_account_data.json", "w", encoding="utf-8") as outfile:
         json.dump(data_list, outfile, indent=2)
 
     # Also, flatten and store to CSV
     df = pd.json_normalize(data_list)
-    df.to_csv("client_data.csv", index=False)
+    df.to_csv("client_account_data.csv", index=False)
