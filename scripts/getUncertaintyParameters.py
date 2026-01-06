@@ -1,4 +1,4 @@
-from my_qualer_utils import QualerAPIFetcher
+from utils.auth import QualerAPIFetcher
 from tqdm import tqdm
 
 with QualerAPIFetcher() as api:
