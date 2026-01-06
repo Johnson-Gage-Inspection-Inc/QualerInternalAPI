@@ -3,22 +3,26 @@ from typing import Any, Dict, Optional
 
 import requests
 from bs4 import BeautifulSoup
+import pandas as pd
 
 
 def get_client_information(
     client_id: int,
+    session: Optional[requests.Session] = None,
     cookies: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
     """
     Fetch client information from Qualer API and parse the HTML response.
 
-    Requires authentication cookies from an active Qualer session.
-    See EXAMPLE_COOKIES variable below for the required cookies.
+    Requires authentication via either a requests.Session with valid cookies
+    or a dictionary of authentication cookies.
 
     Args:
         client_id: The client ID to fetch information for
-        cookies: Dictionary of authentication cookies. If None, will attempt
-                 to use default cookies.
+        session: Optional requests.Session with authentication cookies already set.
+                 If provided, this takes precedence over the cookies parameter.
+        cookies: Optional dictionary of authentication cookies.
+                 Only used if session is not provided.
 
     Returns:
         Dictionary containing the parsed client information
@@ -57,10 +61,11 @@ def get_client_information(
         ),
     }
 
-    # Use a session to handle cookies/credentials
-    session = requests.Session()
-    if cookies:
-        session.cookies.update(cookies)
+    # Use provided session or create a new one
+    if session is None:
+        session = requests.Session()
+        if cookies:
+            session.cookies.update(cookies)
 
     try:
         response = session.get(url, headers=headers, timeout=10)
@@ -94,54 +99,70 @@ def get_client_information(
         raise
 
 
-# Example cookies required for authentication
-# These should be obtained from an active Qualer session
-EXAMPLE_COOKIES = {
-    "_fuid": "YWI1NjEyMmMtMjlmMC00ZWM1LWI3ZTctNzQzZjY2ZGU5NDNk",
-    "__utmz": (
-        "147229740.1757527976.45.2.utmcsr=excel.officeapps.live.com"
-        "|utmccn=(referral)|utmcmd=referral|utmcct=/"
-    ),
-    "GUID": "acadcd3b-26e1-441a-a0fe-db75e2088e55",
-    "Qualer.Employee.Login.SessionId": ("918d9403f0ab4febaa74fa26ead665f7"),
-    "__RequestVerificationToken_L3NoYXJlZC1zZWN1cmVk0": (
-        "IUVgIlmwo3zgnUwGBQxc7XN2T3fA1aXYJ7AhxdjyeDwd2ndcZCPjmgMVN-"
-        "cd9Zqs0z8Y1JzfJ1-lCzGuqxygqF5HztQ1"
-    ),
-    "__utmc": "147229740",
-    "__utma": "147229740.1751280352.1751238350.1767652796.1767734700.120",
-    "Qualer.auth": (
-        "03633F414765DC8DC7A1A55B28279683600018839981B091B067E67E4A0811C35C"
-        "10C7867C44D3FAEC4FFDE023FB5C46DDC1FD06B713C7432FE22A4EE9798C13ABB6D1"
-        "CFCCA4C1550802D6B0EAF729151647DAB1D2873B615BBF072B89FE49C602CA3B17264"
-        "169C561B3462D85B8C00880BD32BEEA20CD59FAAD8E8CF6694B83ED99AD3D72F71ACD"
-        "912DA0B40B55A087DE91116F"
-    ),
-    "__utmb": "147229740.10.10.1767734700",
-    "RT": (
-        "z=1&dm=qualer.com&si=a97cc615-8778-4ba6-a180-0759bf590f61"
-        "&ss=mk33lix9&sl=49&tt=2k02"
-        "&bcn=https%3A%2F%2Fmetrics.qualer.com%2Fapi%2Fmetrics"
-    ),
-    "ASP.NET_SessionId": "ayaikhxyq5uo3vdwcopvc1vi",
-}
+def get_client_information_with_auth(
+    client_id: int,
+    username: Optional[str] = None,
+    password: Optional[str] = None,
+    headless: bool = True,
+) -> Dict[str, Any]:
+    """
+    Fetch client information using QualerAPIFetcher for automatic authentication.
+
+    This function handles the full authentication flow using Selenium and
+    extracts cookies for the API request.
+
+    Args:
+        client_id: The client ID to fetch information for
+        username: Optional Qualer username. If not provided, will prompt or use env var.
+        password: Optional Qualer password. If not provided, will prompt or use env var.
+        headless: Whether to run Selenium in headless mode (default True)
+
+    Returns:
+        Dictionary containing the parsed client information
+
+    Raises:
+        RuntimeError: If authentication fails
+        requests.exceptions.RequestException: If the API request fails
+    """
+    from my_qualer_utils import QualerAPIFetcher
+
+    with QualerAPIFetcher(
+        username=username, password=password, headless=headless
+    ) as fetcher:
+        return get_client_information(client_id, session=fetcher.session)
 
 
 if __name__ == "__main__":
-    from integrations.qualer_sdk.client import make_qualer_client
-    from qualer_sdk.api.clients import get_all_get_2
+    from my_qualer_utils import QualerAPIFetcher
 
-    qualer_client = make_qualer_client()
-
-    clients = get_all_get_2.sync(client=qualer_client)
+    with open("clients.json", "r", encoding="utf-8") as f:
+        clients = json.load(f)
     if not clients:
         print("No clients found")
         exit(1)
 
-    client_ids: list[int] = [c.company_id for c in clients if c.company_id]
-    for client_id in client_ids:
-        try:
-            data = get_client_information(client_id, cookies=EXAMPLE_COOKIES)
-            print(json.dumps(data, indent=2))
-        except Exception as e:
-            print(f"Failed to get client information: {e}")
+    data_list = []
+    client_ids: list[int] = [c["Id"] for c in clients["Data"] if c.get("Id")]
+    with QualerAPIFetcher(headless=False) as fetcher:
+        for client_id in client_ids:
+            try:
+                data = get_client_information(client_id, session=fetcher.session)
+                data_list.append(data)
+                print(f"Client {client_id}:")
+                print(json.dumps(data, indent=2))
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 403:
+                    # Skip clients you don't have access to
+                    continue
+                else:
+                    print(f"Failed to get client {client_id}: {e}")
+            except Exception as e:
+                print(f"Failed to get client {client_id}: {e}")
+
+    # Optionally, store all client data to a JSON file
+    with open("client_data.json", "w", encoding="utf-8") as outfile:
+        json.dump(data_list, outfile, indent=2)
+
+    # Also, flatten and store to CSV
+    df = pd.json_normalize(data_list)
+    df.to_csv("client_data.csv", index=False)
