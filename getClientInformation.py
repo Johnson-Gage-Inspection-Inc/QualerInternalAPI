@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
+from tqdm import tqdm
 
 
 def get_client_information(
@@ -144,12 +145,12 @@ if __name__ == "__main__":
     data_list = []
     client_ids: list[int] = [c["Id"] for c in clients["Data"] if c.get("Id")]
     with QualerAPIFetcher(headless=False) as fetcher:
-        for client_id in client_ids:
+        for client_id in tqdm(
+            client_ids, desc="Fetching client information", dynamic_ncols=True
+        ):
             try:
                 data = get_client_information(client_id, session=fetcher.session)
                 data_list.append(data)
-                print(f"Client {client_id}:")
-                print(json.dumps(data, indent=2))
             except requests.exceptions.HTTPError as e:
                 if e.response.status_code == 403:
                     # Skip clients you don't have access to
