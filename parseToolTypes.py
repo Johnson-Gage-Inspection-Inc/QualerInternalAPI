@@ -3,7 +3,14 @@ from sqlalchemy import create_engine
 import json
 
 # Connect to your Postgres DB (adjust connection string as needed)
-engine = create_engine("postgresql://postgres:postgres@192.168.1.177:5432/qualer")
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+DB_URL = os.getenv("DB_URL")
+if not DB_URL:
+    raise EnvironmentError("DB_URL environment variable is not set")
+engine = create_engine(DB_URL)
 
 file = "C:/Users/JGI/Jeff H/Escape Dantes Inferno/QualerInternalAPI/ToolTypes.json"
 with open(file, "r") as f:

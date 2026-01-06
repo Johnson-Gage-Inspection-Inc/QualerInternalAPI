@@ -6,12 +6,12 @@ QualerInternalAPI is a Python-based data extraction pipeline for the Qualer qual
 ## Architecture & Key Components
 
 ### Core Authentication Pattern
-**Pattern**: `QualerAPIFetcher` (context manager in `my_qualer_utils.py`)
+**Pattern**: `QualerAPIFetcher` (context manager in `utils/auth.py`)
 - Handles browser automation via Selenium for Qualer login
 - Automatically extracts authenticated cookies into a `requests.Session`
 - Provides both DB access (SQLAlchemy) and HTTP access (requests)
 - **Always use as context manager**: `with QualerAPIFetcher() as fetcher: ...`
-- Credentials: `QUALER_USERNAME`/`QUALER_PASSWORD` env vars or interactive prompt
+- Credentials: `QUALER_USERNAME`/`QUALER_PASSWORD`/`DB_URL` env vars or interactive prompt
 - Cleans up Selenium driver automatically on exit
 
 ### Data Extraction Pattern
@@ -33,14 +33,18 @@ Example: `getClientInformation.py` - fetches all client HTML forms, parses with 
 
 ### Running Scripts
 ```bash
-# Activate virtual environment
-.\.venv\Scripts\Activate.ps1
+# First-time setup: install editable package
+pip install -e .
+pip install -r requirements.txt
 
-# Run individual extraction script (prompts for credentials)
-python.exe getClientInformation.py
+# Activate virtual environment
+.venv\Scripts\Activate.ps1
+
+# Run extraction script from any directory (imports work cleanly)
+python scripts/getClientInformation.py
 
 # With environment variables pre-set
-$env:QUALER_USERNAME="user@jgiquality.com"; python.exe getClientInformation.py
+$env:QUALER_USERNAME="user@jgiquality.com"; python scripts/getClientInformation.py
 ```
 
 ### Testing
@@ -80,9 +84,9 @@ $env:QUALER_USERNAME="user@jgiquality.com"; python.exe getClientInformation.py
 ## External Dependencies & Configuration
 
 ### Environment Variables
-- `.env` file auto-loaded by `dotenv` in `integrations/qualer_sdk/client.py`
-- Key vars: `QUALER_USERNAME`, `QUALER_PASSWORD`, `QUALER_API_KEY`
-- Database: `postgresql://postgres:postgres@192.168.1.177:5432/qualer` (hardcoded in `my_qualer_utils.py`, consider parameterizing)
+- `.env` file auto-loaded by `dotenv` in `utils/auth.py` and `parse.py`
+- Key vars: `QUALER_USERNAME`, `QUALER_PASSWORD`, `QUALER_API_KEY`, `DB_URL`
+- Database: Use `DB_URL` environment variable (e.g., `postgresql://postgres:postgres@192.168.1.177:5432/qualer`)
 
 ### Key Libraries
 - **Selenium**: Browser automation for login
@@ -95,15 +99,22 @@ $env:QUALER_USERNAME="user@jgiquality.com"; python.exe getClientInformation.py
 ## File Organization
 
 ```
-getClientInformation.py         # Example: fetch all clients
-getServiceGroups.py            # Example: fetch service groups
-getUncertaintyModal.py         # Example: fetch uncertainty modals
-my_qualer_utils.py             # Core: QualerAPIFetcher class
+scripts/
+  getClientInformation.py       # Example: fetch all clients
+  getServiceGroups.py           # Example: fetch service groups
+  getUncertaintyModal.py        # Example: fetch uncertainty modals
+  getUncertaintyParameters.py   # Example: fetch uncertainty parameters
+utils/
+  auth.py                       # Core: QualerAPIFetcher class
+qualer_internal_sdk/
+  endpoints/                    # Reusable endpoint modules (future)
 integrations/qualer_sdk/       # SDK client configuration
 tests/                         # Unit tests
-clients.json                   # Input: list of clients to fetch
-client_data.json               # Output: extracted client data
-client_data.csv                # Output: CSV export
+data/                          # Input/output data files
+my_qualer_utils.py             # Backward compatibility shim
+parse.py                       # Utility: parse UncertaintyModal responses
+parseToolTypes.py              # Utility: parse ToolTypes.json
+pyproject.toml                 # Package configuration (editable install)
 ```
 
 ## Common Pitfalls & Solutions
