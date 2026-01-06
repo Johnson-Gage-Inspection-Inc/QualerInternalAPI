@@ -5,3 +5,5 @@ sqlalchemy
 tqdm
 requests
 beautifulsoup4
+git+https://github.com/Johnson-Gage-Inspection-Inc/qualer-sdk-python.git@ef6234fe36717cc68f8365a9129a41c705045b31#egg=qualer_sdk
+dotenv
