@@ -12,6 +12,7 @@ from sqlalchemy import create_engine, text
 from bs4 import BeautifulSoup
 import json
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 
@@ -186,3 +187,43 @@ class QualerAPIFetcher:
         new_response.headers = r.headers
         new_response.request = r.request
         return new_response
+
+    def extract_csrf_token(self, html: str) -> str:
+        """
+        Extract CSRF token from HTML page.
+
+        Searches for __RequestVerificationToken in hidden input fields.
+
+        Args:
+            html: HTML content to search
+
+        Returns:
+            The CSRF token value
+
+        Raises:
+            ValueError: If token cannot be found in HTML
+        """
+        # Look for __RequestVerificationToken in hidden input
+        # Pattern allows for attributes like type="hidden" between name and value
+        match = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', html)
+        if match:
+            return match.group(1)
+
+        # Try alternate pattern (value before name)
+        match = re.search(r'value="([^"]+)"[^>]*name="__RequestVerificationToken"', html)
+        if match:
+            return match.group(1)
+
+        # Debug: print a snippet of the HTML
+        print("DEBUG: Could not find token. Checking page structure...")
+        if "__RequestVerificationToken" in html:
+            # Find context around the token
+            idx = html.find("__RequestVerificationToken")
+            snippet = html[max(0, idx - 100) : idx + 200]
+            print(f"Found token reference at:\n{snippet}\n")
+        else:
+            print("Token name not found in HTML at all")
+            # Print first 2000 chars to see structure
+            print(f"HTML snippet:\n{html[:2000]}\n")
+
+        raise ValueError("Could not find CSRF token in page")
