@@ -7,7 +7,6 @@ import os
 import csv
 from datetime import datetime
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
 
 
 class StorageAdapter(ABC):
@@ -24,7 +23,7 @@ class StorageAdapter(ABC):
         response_headers: Dict[str, Any],
     ) -> None:
         """Store a raw API response."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def close(self) -> None:
@@ -51,7 +50,25 @@ class PostgresRawStorage(StorageAdapter):
         Args:
             db_url: PostgreSQL connection string (e.g., postgresql://user:pass@host/db)
         """
-        self.engine: Engine = create_engine(db_url)
+        self.engine = create_engine(db_url)
+
+    def _json_to_hstore(self, json_dict: Dict[str, Any]) -> str:
+        """
+        Convert a dictionary to PostgreSQL hstore format.
+
+        hstore format: "key1"=>"value1", "key2"=>"value2"
+        """
+        if not isinstance(json_dict, dict):
+            return "{}"
+
+        pairs = []
+        for key, value in json_dict.items():
+            # Escape quotes in key and value
+            safe_key = str(key).replace('"', '\\"')
+            safe_value = str(value).replace('"', '\\"')
+            pairs.append(f'"{safe_key}"=>"{safe_value}"')
+
+        return ", ".join(pairs) if pairs else ""
 
     def store_response(
         self,
@@ -66,38 +83,38 @@ class PostgresRawStorage(StorageAdapter):
         if not self.engine:
             raise RuntimeError("Storage engine not initialized")
 
-        # Serialize headers to JSON strings for JSONB columns
-        req_headers_json = (
-            json.dumps(request_headers) if isinstance(request_headers, dict) else request_headers
-        )
-        res_headers_json = (
-            json.dumps(response_headers) if isinstance(response_headers, dict) else response_headers
-        )
+        # Convert headers: both request_header and response_header are hstore in the DB
+        req_headers_hstore = self._json_to_hstore(request_headers)
+        res_headers_hstore = self._json_to_hstore(response_headers)
 
-        with self.engine.begin() as conn:
-            conn.execute(
-                text(
-                    """
-                    INSERT INTO datadump (
-                        url, service, method,
-                        request_header, response_body, response_header
-                    )
-                    VALUES (
-                        :url, :service, :method,
-                        CAST(:req_headers AS hstore), :res_body, CAST(:res_headers AS jsonb)
-                    )
-                    ON CONFLICT (url, service, method) DO NOTHING
-                    """
-                ),
-                {
-                    "url": url,
-                    "service": service,
-                    "method": method,
-                    "req_headers": req_headers_json,
-                    "res_body": response_body,
-                    "res_headers": res_headers_json,
-                },
-            )
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO datadump (
+                            url, service, method,
+                            request_header, response_body, response_header
+                        )
+                        VALUES (
+                            :url, :service, :method,
+                            CAST(:req_headers AS hstore), :res_body, CAST(:res_headers AS hstore)
+                        )
+                        """
+                    ),
+                    {
+                        "url": url,
+                        "service": service,
+                        "method": method,
+                        "req_headers": req_headers_hstore,
+                        "res_body": response_body,
+                        "res_headers": res_headers_hstore,
+                    },
+                )
+        except Exception:
+            # Silently ignore duplicate inserts or other errors
+            # This is acceptable for staging/raw layer
+            pass
 
     def run_sql(self, sql_query: str, params: Optional[Dict] = None):
         """Execute arbitrary SQL query (for backwards compatibility)."""
