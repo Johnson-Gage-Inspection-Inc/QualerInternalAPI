@@ -144,8 +144,7 @@ class QualerAPIFetcher:
         # If JSON response, try to extract from <pre> tag; otherwise store raw HTML
         if content_type.startswith("application/json") or "json" in content_type:
             soup = BeautifulSoup(response_body, "html.parser")
-            pre = soup.find("pre")
-            if pre:
+            if pre := soup.find("pre"):  # HACK: What's the significance of <pre> here?
                 response_body = pre.text.strip()
 
         # Store response to database
