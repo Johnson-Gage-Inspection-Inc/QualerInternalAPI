@@ -3,7 +3,6 @@
 Endpoint: GET /Client/ClientInformation
 """
 
-import json
 from typing import Optional
 
 from utils.auth import QualerAPIFetcher
@@ -23,13 +22,13 @@ def fetch_and_store(client_ids: list, api: Optional[QualerAPIFetcher] = None) ->
     """
 
     def _do_fetch(fetcher):
-        for clientid in tqdm(client_ids, desc="Fetching client data", dynamic_ncols=True):
-            url = f"https://jgiquality.qualer.com/Client/ClientInformation?clientId={clientid}"
+        for client_id in tqdm(client_ids, desc="Fetching client data", dynamic_ncols=True):
+            url = f"https://jgiquality.qualer.com/Client/ClientInformation?clientId={client_id}"
             try:
                 fetcher.fetch_and_store(url, "ClientInformation")
             except Exception as e:
                 # Skip clients with permission errors or other failures
-                print(f"\nWarning: Failed to fetch client {clientid}: {e}")
+                print(f"\nWarning: Failed to fetch client {client_id}: {e}")
                 continue
 
     if api:

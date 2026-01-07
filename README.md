@@ -192,7 +192,7 @@ qualer_internal_sdk/endpoints/
 ## Project Structure
 
 ```
-c:\Users\JeffHall\git\QualerInternalAPI\
+QualerInternalAPI/
 ├── README.md                    # This file
 ├── qualer_internal_sdk/
 │   ├── __init__.py

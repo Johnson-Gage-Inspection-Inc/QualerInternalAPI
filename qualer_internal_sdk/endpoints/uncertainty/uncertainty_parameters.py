@@ -93,17 +93,8 @@ class UncertaintyParametersEndpoint:
         response = self.session.get(url, timeout=30)
         response.raise_for_status()
 
-        # Store in database if driver is available
-        if self.driver:
-            self._store_response(url, response, service_name)
-
         return (
             response.json()
             if response.headers.get("content-type", "").lower().startswith("application/json")
             else {"raw": response.text[:500]}
         )
-
-    def _store_response(self, url: str, response: Any, service_name: str) -> None:
-        """Store API response in database."""
-        # Placeholder for future database integration
-        pass
