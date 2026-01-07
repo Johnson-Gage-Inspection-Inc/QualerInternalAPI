@@ -24,6 +24,21 @@ class QualerAPIFetcher:
 
     Uses Selenium for browser automation to handle login, then provides an
     authenticated requests.Session for API calls.
+
+    Authentication Patterns:
+    -----------------------
+
+    🌐 HTTP-Based Methods (use when possible):
+        - get()  → Standard HTTP GET with requests.Session
+        - post() → Standard HTTP POST with requests.Session
+        - fetch() → HTTP GET with <pre> tag extraction
+        ✅ Use for: Standard REST APIs that accept HTTP requests
+        ❌ Fails with: 401 errors on some Qualer internal endpoints
+
+    🖥️ Browser-Based Methods (use when HTTP fails):
+        - fetch_via_browser() → JavaScript fetch() executed in browser
+        ✅ Use for: Qualer internal APIs that validate browser context
+        ⚠️ Slower but bypasses authentication validation issues
     """
 
     def __init__(
@@ -449,7 +464,63 @@ class QualerAPIFetcher:
 
         raise ValueError("Could not find CSRF token in page")
 
-    def execute_endpoint(
+    def _generate_browser_fetch_js(self, method: str, url: str, body: Optional[str] = None) -> str:
+        """
+        Generate JavaScript fetch code to execute in browser context.
+
+        This JavaScript code is injected into the authenticated browser session
+        and executed via execute_async_script(). The browser's authentication
+        context is what makes these requests succeed (pure HTTP requests fail).
+
+        Args:
+            method: HTTP method ("GET" or "POST")
+            url: Full URL including query string for GET
+            body: URL-encoded form data string for POST (None for GET)
+
+        Returns:
+            JavaScript code string ready for execute_async_script()
+        """
+        if method.upper() == "GET":
+            return f"""
+            var callback = arguments[arguments.length - 1];
+            fetch('{url}', {{
+                method: 'GET',
+                headers: {{
+                    'x-requested-with': 'XMLHttpRequest'
+                }},
+                credentials: 'include'
+            }})
+            .then(response => response.json())
+            .then(data => callback(data))
+            .catch(error => callback({{error: error.toString()}}));
+            """
+        else:  # POST
+            return f"""
+            var callback = arguments[arguments.length - 1];
+            fetch('{url}', {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'x-requested-with': 'XMLHttpRequest'
+                }},
+                body: '{body}',
+                credentials: 'include'
+            }})
+            .then(response => {{
+                if (!response.ok) {{
+                    return callback({{error: 'HTTP ' + response.status + ': ' + response.statusText}});
+                }}
+                return response.json();
+            }})
+            .then(data => {{
+                if (data && !data.error) {{
+                    callback(data);
+                }}
+            }})
+            .catch(error => callback({{error: error.toString()}}));
+            """
+
+    def fetch_via_browser(
         self,
         method: str,
         endpoint_path: str,
@@ -458,15 +529,25 @@ class QualerAPIFetcher:
         include_csrf: Optional[bool] = None,
     ) -> dict:
         """
-        Execute a Qualer API endpoint using JavaScript fetch in authenticated browser context.
+        Fetch API endpoint by executing JavaScript fetch() inside authenticated browser.
 
-        This is the standard pattern for calling Qualer's internal API. Direct HTTP requests
-        fail with 401 even with valid cookies because Qualer validates JavaScript execution context.
+        ⚠️ BROWSER-BASED APPROACH - Use this instead of get()/post() for endpoints that:
+        - Return 401 errors with pure HTTP requests (even with valid cookies/CSRF)
+        - Require JavaScript execution context for authentication validation
+        - Are part of Qualer's internal/undocumented API
+
+        This method:
+        1. Navigates to a page to establish auth context
+        2. Generates JavaScript fetch() code
+        3. Injects and executes it in the browser via Selenium
+        4. Returns the parsed JSON response
+
+        For standard REST APIs that accept HTTP requests, use get() or post() instead.
 
         Args:
             method: HTTP method - "GET" or "POST"
             endpoint_path: API endpoint path (e.g., "/ClientDashboard/ClientsCountView")
-            auth_context_page: Page to navigate to for auth context (e.g., "/ClientDashboard/Clients")
+            auth_context_page: Page to navigate to for auth context (e.g., "/clients")
             params: Request parameters (query params for GET, form data for POST)
             include_csrf: Whether to include CSRF token (default: True for POST, False for GET)
 
@@ -477,11 +558,12 @@ class QualerAPIFetcher:
             RuntimeError: If driver not initialized or JavaScript execution fails
 
         Example:
-            >>> response = api.execute_endpoint(
-            ...     method="GET",
-            ...     endpoint_path="/ClientDashboard/ClientsCountView",
-            ...     auth_context_page="/ClientDashboard/Clients",
-            ...     params={"Search": "", "FilterType": "AllClients"},
+            >>> # Endpoint that requires browser context
+            >>> response = api.fetch_via_browser(
+            ...     method="POST",
+            ...     endpoint_path="/ClientDashboard/Clients_Read",
+            ...     auth_context_page="/clients",
+            ...     params={"sort": "Name-asc", "page": 1},
             ... )
         """
         if not self.driver:
@@ -509,57 +591,19 @@ class QualerAPIFetcher:
                 print("WARNING: No CSRF token found, proceeding without it...")
                 pass
 
-        # Build the request based on method
-        if method.upper() == "GET":
-            from urllib.parse import urlencode
+        # Build URL and generate JavaScript fetch code
+        from urllib.parse import urlencode
 
+        if method.upper() == "GET":
             query_string = urlencode(params)
             url = f"{base_url}{endpoint_path}?{query_string}"
-
-            js_code = f"""
-            var callback = arguments[arguments.length - 1];
-            fetch('{url}', {{
-                method: 'GET',
-                headers: {{
-                    'x-requested-with': 'XMLHttpRequest'
-                }},
-                credentials: 'include'
-            }})
-            .then(response => response.json())
-            .then(data => callback(data))
-            .catch(error => callback({{error: error.toString()}}));
-            """
+            js_code = self._generate_browser_fetch_js("GET", url)
         else:  # POST
-            from urllib.parse import urlencode
-
-            payload = urlencode(params)
             url = f"{base_url}{endpoint_path}"
+            payload = urlencode(params)
+            js_code = self._generate_browser_fetch_js("POST", url, payload)
 
-            js_code = f"""
-            var callback = arguments[arguments.length - 1];
-            fetch('{url}', {{
-                method: 'POST',
-                headers: {{
-                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                    'x-requested-with': 'XMLHttpRequest'
-                }},
-                body: '{payload}',
-                credentials: 'include'
-            }})
-            .then(response => {{
-                if (!response.ok) {{
-                    return callback({{error: 'HTTP ' + response.status + ': ' + response.statusText}});
-                }}
-                return response.json();
-            }})
-            .then(data => {{
-                if (data && !data.error) {{
-                    callback(data);
-                }}
-            }})
-            .catch(error => callback({{error: error.toString()}}));
-            """
-
+        # Execute JavaScript in browser and get result
         result = self.driver.execute_async_script(js_code)
 
         if isinstance(result, dict) and "error" in result:

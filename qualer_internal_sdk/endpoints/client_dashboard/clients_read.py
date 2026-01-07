@@ -45,7 +45,7 @@ def clients_read(
         >>> print(f"Fetched {len(response['Data'])} of {response['Total']} clients")
     """
     with QualerAPIFetcher() as api:
-        return api.execute_endpoint(
+        return api.fetch_via_browser(
             method="POST",
             endpoint_path="/ClientDashboard/Clients_Read",
             auth_context_page="/clients",

@@ -28,7 +28,7 @@ def clients_count_view(
         >>> print(f"Inactive clients: {counts['view']['Inactive']}")
     """
     with QualerAPIFetcher() as api:
-        return api.execute_endpoint(
+        return api.fetch_via_browser(
             method="GET",
             endpoint_path="/ClientDashboard/ClientsCountView",
             auth_context_page="/ClientDashboard/Clients",
