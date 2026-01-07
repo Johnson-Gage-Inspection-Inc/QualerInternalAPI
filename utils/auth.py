@@ -303,6 +303,7 @@ class QualerAPIFetcher:
         url: str,
         data: Optional[dict] = None,
         referer: Optional[str] = None,
+        include_csrf: bool = True,
         **kwargs,
     ) -> requests.Response:
         """
@@ -311,10 +312,14 @@ class QualerAPIFetcher:
         Automatically includes common headers (accept, cache-control, etc.) plus
         x-requested-with and content-type headers appropriate for form data submission.
 
+        Optionally auto-injects CSRF token if needed (default: True).
+
         Args:
             url: Endpoint URL
             data: (Optional) Form data dictionary to POST
             referer: (Optional) Referer URL for the request
+            include_csrf: (Optional) Automatically extract and inject CSRF token if missing
+                         from data dict and driver has loaded page (default: True)
             **kwargs: Additional arguments passed to session.post() (timeout, etc.)
 
         Returns:
@@ -325,6 +330,7 @@ class QualerAPIFetcher:
             requests.HTTPError: If response status indicates error
 
         Example:
+            >>> # CSRF token automatically added if needed
             >>> response = api.post(
             ...     "https://jgiquality.qualer.com/ClientDashboard/Clients_Read",
             ...     data={"sort": "Name-asc", "page": 1, ...},
@@ -335,6 +341,19 @@ class QualerAPIFetcher:
         """
         if not self.session:
             raise RuntimeError("No valid session. Did login succeed?")
+
+        # Auto-inject CSRF token if requested and not already in data
+        if data is None:
+            data = {}
+
+        if include_csrf and "__RequestVerificationToken" not in data:
+            if self.driver and self.driver.current_url:
+                try:
+                    csrf_token = self.extract_csrf_token(self.driver.page_source)
+                    data["__RequestVerificationToken"] = csrf_token
+                except ValueError:
+                    # Token not found - endpoint might not require it
+                    pass
 
         # Get standard headers with POST-specific additions
         headers = self.get_headers(

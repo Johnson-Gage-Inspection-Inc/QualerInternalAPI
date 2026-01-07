@@ -1,6 +1,7 @@
 """Fetch all clients from Qualer ClientDashboard API."""
 
 from time import sleep
+from urllib.parse import urlencode
 
 from utils.auth import QualerAPIFetcher
 from .types import FilterType, SortField, SortOrder
@@ -41,10 +42,13 @@ def clients_read(
 
     Raises:
         RuntimeError: If Selenium driver initialization fails
-        Exception: If API request fails
+
+    Note:
+        This endpoint requires JavaScript execution in browser context.
+        Direct HTTP POST requests fail with 401 even with valid cookies/CSRF tokens.
     """
     with QualerAPIFetcher() as api:
-        # Navigate to clients page first to establish proper browser context and cookies
+        # Navigate to clients page to establish authenticated browser context
         print("Navigating to clients page...")
         if not api.driver:
             raise RuntimeError("Failed to initialize Selenium driver")
@@ -54,31 +58,49 @@ def clients_read(
         # Give page time to load and render
         sleep(3)
 
-        # Extract CSRF token from page source
+        # Extract CSRF token from page
         print("Extracting CSRF token...")
-        page_source = api.driver.page_source
-        csrf_token = api.extract_csrf_token(page_source)
-        print(f"✓ Got CSRF token: {csrf_token[:20]}...")
+        csrf_token = api.extract_csrf_token(api.driver.page_source)
 
         url = "https://jgiquality.qualer.com/ClientDashboard/Clients_Read"
 
-        # Request parameters matching the web UI - MUST include CSRF token
+        # Build POST payload
         payload = {
-            "sort": f"{sort_by}-{sort_order}",
+            "sort": f"{sort_by.value}-{sort_order.value}",
             "page": page,
             "pageSize": page_size,
             "group": group,
             "filter": filter_str,
             "search": search,
-            "filterType": filter_type,
-            "__RequestVerificationToken": csrf_token,  # CRITICAL: Include CSRF token
+            "filterType": filter_type.value,
+            "__RequestVerificationToken": csrf_token,
         }
 
-        try:
-            print("Fetching client list...")
-            # Use api.post() for simplified header management - handles all standard headers
-            response = api.post(url, data=payload, referer=clients_page_url, timeout=30)
-            return response.json()
-        except Exception as e:
-            print(f"Error fetching clients: {e}")
-            raise
+        # URL-encode payload for JavaScript fetch
+        payload_str = urlencode(payload)
+
+        print("Fetching client list...")
+        # Use JavaScript fetch to maintain browser authentication context
+        result = api.driver.execute_async_script(
+            f"""
+            var callback = arguments[arguments.length - 1];
+            fetch("{url}", {{
+                method: "POST",
+                headers: {{
+                    "accept": "*/*",
+                    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "x-requested-with": "XMLHttpRequest"
+                }},
+                body: "{payload_str}",
+                credentials: "include"
+            }})
+            .then(response => response.json())
+            .then(callback)
+            .catch(err => callback({{error: err.toString()}}));
+        """
+        )
+
+        if result.get("error"):
+            raise RuntimeError(f"JavaScript fetch failed: {result['error']}")
+
+        return result
