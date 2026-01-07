@@ -7,6 +7,7 @@ import os
 import csv
 from datetime import datetime
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 
 
 class StorageAdapter(ABC):
@@ -78,6 +79,7 @@ class PostgresRawStorage(StorageAdapter):
                             :url, :service, :method,
                             CAST(:req_headers AS jsonb), :res_body, CAST(:res_headers AS jsonb)
                         )
+                        ON CONFLICT (url, service, method) DO NOTHING
                         """
                     ),
                     {
@@ -277,13 +279,10 @@ class ORMStorage(StorageAdapter):
 
             session.add(response)
             session.commit()
-        except Exception as e:
+        except IntegrityError:
             session.rollback()
-            # Gracefully handle duplicate key errors (409 Conflict)
-            if "unique constraint" in str(e).lower():
-                pass  # Duplicate - expected for idempotent operations
-            else:
-                raise
+            # Duplicate key violation - expected for idempotent operations
+            pass
         finally:
             session.close()
 

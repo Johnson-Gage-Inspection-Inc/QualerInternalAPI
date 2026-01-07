@@ -143,4 +143,4 @@ alembic upgrade head
 
 **Pre-Alembic**: Schema was managed via `persistence/schema.py` with `create_datadump_table()` function. This led to schema drift between environments and made schema evolution difficult.
 
-**Post-Alembic** (Current): All schema changes are version-controlled migrations. The initial migration (`4f539123b6db`) converts hstore columns to JSONB to match ORM models.
+**Post-Alembic** (Current): All schema changes are version-controlled migrations. The initial migration (`765f93117946`) creates the datadump table with JSONB columns for efficient querying.
