@@ -65,13 +65,13 @@ class QualerAPIFetcher:
         """
         # Storage setup
         if storage:
-            self.storage = storage
+            self.storage: Optional[StorageAdapter] = storage
         elif db_url:
-            self.storage = PostgresRawStorage(db_url)
+            self.storage: Optional[StorageAdapter] = PostgresRawStorage(db_url)
         else:
             # Try environment variable for backward compatibility
             db_url = os.getenv("DB_URL")
-            self.storage = PostgresRawStorage(db_url) if db_url else None
+            self.storage: Optional[StorageAdapter] = PostgresRawStorage(db_url) if db_url else None
 
         # Authentication setup
         self.username = username or os.getenv("QUALER_USERNAME")
