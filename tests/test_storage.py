@@ -154,7 +154,7 @@ class TestCSVStorage:
             
             # Verify CSV content
             with open(csv_path, "r", encoding="utf-8") as f:
-                reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
+                reader = csv.DictReader(f)
                 rows = list(reader)
                 assert len(rows) == 1
                 assert rows[0]["url"] == "https://example.com/api/test"
@@ -183,7 +183,7 @@ class TestCSVStorage:
             
             # Verify both rows exist
             with open(csv_path, "r", encoding="utf-8") as f:
-                reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
+                reader = csv.DictReader(f)
                 rows = list(reader)
                 assert len(rows) == 2
                 assert rows[0]["response_body"] == "Response 0"
@@ -217,7 +217,7 @@ class TestCSVStorage:
                 
                 # Parse and verify the malicious content is treated as data
                 f.seek(0)
-                reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
+                reader = csv.DictReader(f)
                 rows = list(reader)
                 assert len(rows) == 1
                 assert rows[0]["response_body"] == malicious_content
@@ -243,7 +243,7 @@ class TestCSVStorage:
             
             # Verify content is preserved correctly
             with open(csv_path, "r", encoding="utf-8") as f:
-                reader = csv.DictReader(f, quoting=csv.QUOTE_ALL)
+                reader = csv.DictReader(f)
                 rows = list(reader)
                 assert len(rows) == 1
                 assert rows[0]["response_body"] == special_response
