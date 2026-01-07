@@ -1,6 +1,6 @@
 """Response type definitions for ClientDashboard API endpoints."""
 
-from typing import TypedDict, List, Any
+from typing import TypedDict, List, Any, Dict
 
 
 class ClientsCountViewResponse(TypedDict):
@@ -28,7 +28,7 @@ class ClientCountsView(TypedDict):
 class ClientsReadResponse(TypedDict):
     """Response structure for Clients_Read endpoint."""
 
-    Data: List[dict[str, Any]]  # Client records with various fields
+    Data: List[Dict[str, Any]]  # Client records with various fields
     Total: int
     AggregateResults: Any  # Can be None or aggregate data
     Errors: Any  # Can be None or error information

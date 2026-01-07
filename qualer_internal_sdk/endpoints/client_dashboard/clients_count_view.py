@@ -20,7 +20,7 @@ def clients_count_view(
 
     Returns:
         ClientsCountViewResponse: Typed response with Success flag and view containing
-            client counts grouped by filter type (AllClients, Prospect, Delinquent,
+            client counts grouped by filter type (AllClients, Prospects, Delinquent,
             Inactive, Unapproved, Hidden, OfflineFulfillment, AssetsDue,
             AssetsPastDue, AssetsPastDuePeriod)
 

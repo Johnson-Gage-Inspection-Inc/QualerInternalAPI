@@ -111,7 +111,7 @@ class QualerAPIFetcher:
         """Called upon exiting the `with` block. Cleans up resources."""
         if self.driver:
             self.driver.quit()
-            self.driver = None  # type: ignore
+            self.driver = None
         if self.storage:
             self.storage.close()
 
@@ -593,7 +593,6 @@ class QualerAPIFetcher:
                 # Token not found - some endpoints may not require it
                 # or it may be injected differently. Proceed without it.
                 print("WARNING: No CSRF token found, proceeding without it...")
-                pass
 
         # Build URL and generate JavaScript fetch code
         from urllib.parse import urlencode
