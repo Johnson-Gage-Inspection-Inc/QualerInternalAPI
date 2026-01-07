@@ -28,14 +28,6 @@ def _postgres_container_session():
                 raise RuntimeError(f"Database not ready after {max_retries} retries: {e}")
             time.sleep(retry_delay)
 
-    # Enable hstore extension
-    from sqlalchemy import create_engine, text
-
-    engine = create_engine(connection_url)
-    with engine.begin() as conn:
-        conn.execute(text("CREATE EXTENSION IF NOT EXISTS hstore"))
-    engine.dispose()
-
     yield connection_url
 
 
@@ -61,7 +53,6 @@ def postgres_container(_postgres_container_session):
 
     with engine.begin() as conn:
         # Drop all tables for clean state
-        conn.execute(text("DROP TABLE IF EXISTS api_response CASCADE"))
         conn.execute(text("DROP TABLE IF EXISTS datadump CASCADE"))
         conn.execute(text("DROP TABLE IF EXISTS alembic_version CASCADE"))
 
@@ -69,13 +60,13 @@ def postgres_container(_postgres_container_session):
 
     # Run Alembic migrations to create fresh schema
     import pathlib
-    
+
     project_root = pathlib.Path(__file__).parent.parent
     alembic_ini_path = project_root / "alembic.ini"
-    
+
     alembic_cfg = Config(str(alembic_ini_path))
     alembic_cfg.set_main_option("sqlalchemy.url", connection_url)
-    
+
     # Stamp the database as being at "base" (no migrations) so upgrade works
     command.stamp(alembic_cfg, "base")
     # Now run all migrations
@@ -88,3 +79,10 @@ def postgres_container(_postgres_container_session):
 def db_url(postgres_container):
     """Provide database URL from testcontainer."""
     return postgres_container
+
+
+def pytest_collection_modifyitems(config, items):
+    """Auto-apply postgres_container fixture to tests marked with @pytest.mark.database."""
+    for item in items:
+        if item.get_closest_marker("database"):
+            item.fixturenames.append("postgres_container")
