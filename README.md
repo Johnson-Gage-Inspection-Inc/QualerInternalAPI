@@ -117,6 +117,30 @@ Parse stored HTML and export as JSON/CSV:
 python scripts/parseClientInformation.py
 ```
 
+### `scripts/getServiceGroups.py`
+
+Fetch and store service groups for all work items:
+
+```bash
+python scripts/getServiceGroups.py
+```
+
+### `scripts/getUncertaintyParameters.py`
+
+Fetch and store uncertainty parameters for all measurements:
+
+```bash
+python scripts/getUncertaintyParameters.py
+```
+
+### `scripts/getUncertaintyModal.py`
+
+Fetch and store uncertainty modals for all measurement batches:
+
+```bash
+python scripts/getUncertaintyModal.py
+```
+
 ## Architecture
 
 ### Unified Client Interface
@@ -125,15 +149,16 @@ The `QualerClient` provides a clean, nested API:
 
 ```python
 with QualerClient() as client:
-    client.client_dashboard.clients_read()      # ClientDashboard endpoints
-    client.client.fetch_and_store(ids)          # Client endpoints
-    client.service.???()                        # Service endpoints (TODO)
-    client.uncertainty.???()                    # Uncertainty endpoints (TODO)
+    client.client_dashboard.clients_read()      # Fetch all clients
+    client.client.fetch_and_store(ids)          # Fetch client details
+    client.service.get_service_groups(item_id)  # Fetch service groups
+    client.uncertainty.get_parameters(m_id, b_id)  # Fetch uncertainty parameters
+    client.uncertainty.get_modal(m_id, b_id)    # Fetch uncertainty modal
 ```
 
 ### Endpoint Modules
 
-Organized by URL structure:
+Organized by URL structure and functionality:
 
 ```
 qualer_internal_sdk/endpoints/
@@ -141,8 +166,11 @@ qualer_internal_sdk/endpoints/
   │   └── clients_read.py          # POST /ClientDashboard/Clients_Read
   ├── client/
   │   └── client_information.py    # GET /Client/ClientInformation
-  ├── service/                     # TODO
-  └── uncertainty/                 # TODO
+  ├── service/
+  │   └── service_groups.py        # GET /work/TaskDetails/GetServiceGroupsForExistingLevels
+  └── uncertainty/
+      ├── uncertainty_parameters.py # GET /work/Uncertainties/UncertaintyParameters
+      └── uncertainty_modal.py      # GET /work/Uncertainties/UncertaintyModal
 ```
 
 ### Core Infrastructure
