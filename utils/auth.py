@@ -140,6 +140,50 @@ class QualerAPIFetcher:
         for cookie in self.driver.get_cookies():
             self.session.cookies.set(cookie["name"], cookie["value"])
 
+    def get_headers(self, referer: Optional[str] = None, **overrides) -> dict:
+        """
+        Get standard Qualer API headers with optional customization.
+
+        Provides sensible defaults for common Qualer API calls. All headers
+        are standard except referer, which must be set based on current context.
+
+        Args:
+            referer: (Optional) Referer URL. If not provided, uses current driver URL
+                     or falls back to Qualer base URL.
+            **overrides: Additional headers to override or add
+                        (keys with underscores are converted to hyphens)
+
+        Returns:
+            Dictionary of HTTP headers ready for requests
+
+        Example:
+            >>> headers = api.get_headers(referer="https://jgiquality.qualer.com/clients")
+            >>> response = api.session.post(url, data=payload, headers=headers)
+        """
+        # Default referer: use current driver URL or fall back to base
+        if referer is None:
+            if self.driver:
+                referer = self.driver.current_url
+            else:
+                referer = "https://jgiquality.qualer.com/"
+
+        # Standard headers for Qualer API requests
+        headers = {
+            "accept": "*/*",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "en-US,en;q=0.9",
+            "cache-control": "no-cache, must-revalidate",
+            "pragma": "no-cache",
+            "referer": referer,
+        }
+
+        # Convert underscore keys to hyphenated headers
+        for key, value in overrides.items():
+            header_name = key.replace("_", "-")
+            headers[header_name] = value
+
+        return headers
+
     def run_sql(self, sql_query, params=None):
         """
         Execute a SQL query and return all rows.
@@ -161,48 +205,26 @@ class QualerAPIFetcher:
         """
         Fetch URL and store response using configured storage adapter.
 
-        The <pre> tag extraction is because Qualer wraps JSON responses in HTML.
-        When you request a JSON endpoint, it returns: <html><body><pre>{json}</pre></body></html>
-        We extract the JSON from the <pre> tag to store clean data.
-        """
-        if not self.driver or not self.session:
-            raise RuntimeError("Driver or session not initialized")
+        Combines fetch() (Selenium-based with <pre> tag extraction) and store()
+        to fetch HTML-wrapped JSON and store it in the configured backend.
 
+        Args:
+            url: Endpoint URL to fetch
+            service: Service name for storage organization
+            method: HTTP method for logging (default: "GET")
+
+        Raises:
+            RuntimeError: If driver, session, or storage not initialized
+        """
         if not self.storage:
             raise RuntimeError(
                 "No storage configured. Provide db_url or storage adapter to use fetch_and_store."
             )
 
-        # First, get response headers from requests to check Content-Type
-        r = self.session.get(url)
-        # Handle HTTP errors early to avoid inserting error pages into the database.
-        # Skip 403s gracefully in bulk operations, per project conventions.
-        if r.status_code == 403:
-            print(f"Warning: 403 Forbidden when accessing {url}. Skipping.")
-            return
-        r.raise_for_status()
-        content_type = r.headers.get("Content-Type", "").lower()
-
-        # Use Selenium to get the actual response body (handles JavaScript-rendered content)
-        self.driver.get(url)
-        response_body = self.driver.page_source
-
-        # If JSON response, try to extract from <pre> tag; otherwise store raw HTML
-        # NOTE: Qualer wraps JSON in <html><body><pre>{...}</pre></body></html>
-        if content_type.startswith("application/json") or "json" in content_type:
-            soup = BeautifulSoup(response_body, "html.parser")
-            if pre := soup.find("pre"):
-                response_body = pre.text.strip()
-
-        # Store using configured adapter (PostgreSQL, CSV, etc.)
-        self.storage.store_response(
-            url=url,
-            service=service,
-            method=method,
-            request_headers=dict(r.request.headers) if r.request else {},
-            response_body=response_body,
-            response_headers=dict(r.headers),
-        )
+        # Use fetch() to handle Selenium navigation and <pre> tag extraction
+        response = self.fetch(url)
+        # Use store() to save the response via the configured storage adapter
+        self.store(url, service, method, response)
 
     def store(self, url, service, method, response):
         """
@@ -231,8 +253,121 @@ class QualerAPIFetcher:
             response_headers=dict(response.headers),
         )
 
+    def get(
+        self, url: str, params: Optional[dict] = None, referer: Optional[str] = None, **kwargs
+    ) -> requests.Response:
+        """
+        GET request with standard Qualer headers pre-configured.
+
+        Automatically includes common headers (accept, cache-control, etc.).
+        Simplifies endpoint implementations.
+
+        Args:
+            url: Endpoint URL
+            params: (Optional) Query parameters dictionary
+            referer: (Optional) Referer URL for the request
+            **kwargs: Additional arguments passed to session.get() (timeout, etc.)
+
+        Returns:
+            requests.Response object
+
+        Raises:
+            RuntimeError: If session not initialized
+            requests.HTTPError: If response status indicates error
+
+        Example:
+            >>> response = api.get(
+            ...     "https://jgiquality.qualer.com/ClientDashboard/Clients_Read",
+            ...     params={"sort": "Name-asc", "page": 1, ...},
+            ...     referer="https://jgiquality.qualer.com/clients",
+            ...     timeout=30
+            ... )
+            >>> data = response.json()
+        """
+        if not self.session:
+            raise RuntimeError("No valid session. Did login succeed?")
+
+        # Get standard headers
+        headers = self.get_headers(
+            referer=referer,
+            x_requested_with="XMLHttpRequest",
+        )
+
+        # Make request with standard headers
+        response = self.session.get(url, params=params, headers=headers, **kwargs)
+        response.raise_for_status()
+        return response
+
+    def post(
+        self,
+        url: str,
+        data: Optional[dict] = None,
+        referer: Optional[str] = None,
+        **kwargs,
+    ) -> requests.Response:
+        """
+        POST request with standard Qualer headers pre-configured.
+
+        Automatically includes common headers (accept, cache-control, etc.) plus
+        x-requested-with and content-type headers appropriate for form data submission.
+
+        Args:
+            url: Endpoint URL
+            data: (Optional) Form data dictionary to POST
+            referer: (Optional) Referer URL for the request
+            **kwargs: Additional arguments passed to session.post() (timeout, etc.)
+
+        Returns:
+            requests.Response object
+
+        Raises:
+            RuntimeError: If session not initialized
+            requests.HTTPError: If response status indicates error
+
+        Example:
+            >>> response = api.post(
+            ...     "https://jgiquality.qualer.com/ClientDashboard/Clients_Read",
+            ...     data={"sort": "Name-asc", "page": 1, ...},
+            ...     referer="https://jgiquality.qualer.com/clients",
+            ...     timeout=30
+            ... )
+            >>> client_data = response.json()
+        """
+        if not self.session:
+            raise RuntimeError("No valid session. Did login succeed?")
+
+        # Get standard headers with POST-specific additions
+        headers = self.get_headers(
+            referer=referer,
+            x_requested_with="XMLHttpRequest",
+            content_type="application/x-www-form-urlencoded; charset=UTF-8",
+        )
+
+        # Make request with standard headers
+        response = self.session.post(url, data=data, headers=headers, **kwargs)
+        response.raise_for_status()
+        return response
+
     def fetch(self, url):
-        """Fetch URL using authenticated session."""
+        """
+        Fetch URL using authenticated session with Qualer's HTML-wrapped JSON handling.
+
+        Qualer wraps JSON responses in HTML: <html><body><pre>{json}</pre></body></html>
+        This method extracts the JSON from the <pre> tag using Selenium.
+
+        Args:
+            url: Endpoint URL to fetch
+
+        Returns:
+            requests.Response object with actual JSON body (not HTML-wrapped)
+
+        Raises:
+            RuntimeError: If session not initialized or <pre> tag not found in response
+
+        Example:
+            >>> response = api.fetch("https://jgiquality.qualer.com/work/Uncertainties/...")
+            >>> data = response.json()
+        """
         if not self.session:
             raise RuntimeError("No valid session. Did login succeed?")
         r = self.session.get(url)

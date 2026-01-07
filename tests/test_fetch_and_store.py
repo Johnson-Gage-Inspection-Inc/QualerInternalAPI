@@ -8,42 +8,31 @@ from utils.auth import QualerAPIFetcher
 class TestFetchAndStore:
     """Tests for fetch_and_store method."""
 
-    @patch("utils.auth.QualerAPIFetcher._build_requests_session")
-    @patch("utils.auth.QualerAPIFetcher._login")
-    @patch("utils.auth.QualerAPIFetcher._init_driver")
-    def test_fetch_and_store_html_response(self, mock_init, mock_login, mock_session):
-        """Test fetch_and_store with HTML response."""
+    @patch("utils.auth.QualerAPIFetcher.store")
+    @patch("utils.auth.QualerAPIFetcher.fetch")
+    def test_fetch_and_store_html_response(self, mock_fetch, mock_store):
+        """Test fetch_and_store delegates to fetch() and store()."""
         # Setup mocks
-        mock_driver = Mock()
-        mock_driver.page_source = "<html><body>Test HTML</body></html>"
-
-        mock_session_obj = Mock()
         mock_response = Mock()
-        mock_response.headers.get.return_value = "text/html"
-        mock_response.request.headers = {"User-Agent": "test"}
-        mock_response.headers = {"Content-Type": "text/html"}
-        mock_session_obj.get.return_value = mock_response
+        mock_fetch.return_value = mock_response
 
         # Mock storage adapter
         mock_storage = MagicMock()
 
         # Create fetcher and set up required attributes
         fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        fetcher.driver = mock_driver
-        fetcher.session = mock_session_obj
         fetcher.storage = mock_storage
 
         # Call method
-        fetcher.fetch_and_store("https://example.com", "TestService")
+        fetcher.fetch_and_store("https://example.com", "TestService", method="GET")
 
-        # Verify session.get was called
-        mock_session_obj.get.assert_called_once_with("https://example.com")
+        # Verify fetch was called with the URL
+        mock_fetch.assert_called_once_with("https://example.com")
 
-        # Verify driver.get was called
-        mock_driver.get.assert_called_once_with("https://example.com")
-
-        # Verify storage adapter was called
-        mock_storage.store_response.assert_called_once()
+        # Verify store was called with the response
+        mock_store.assert_called_once_with(
+            "https://example.com", "TestService", "GET", mock_response
+        )
 
     @patch("utils.auth.QualerAPIFetcher._build_requests_session")
     @patch("utils.auth.QualerAPIFetcher._login")
@@ -107,22 +96,30 @@ class TestFetchAndStore:
         # Verify storage adapter was called
         assert mock_storage.store_response.called
 
-    def test_fetch_and_store_no_session_raises_error(self):
-        """Test that RuntimeError is raised if session is not initialized."""
+    @patch("utils.auth.QualerAPIFetcher.fetch")
+    def test_fetch_and_store_no_session_raises_error(self, mock_fetch):
+        """Test that RuntimeError is raised if storage is not configured."""
+        # Mock fetch to succeed
+        mock_fetch.return_value = Mock()
+
         fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
         fetcher.driver = Mock()
         fetcher.session = None
-        fetcher.storage = Mock()
+        fetcher.storage = None
 
-        with pytest.raises(RuntimeError, match="Driver or session not initialized"):
+        with pytest.raises(RuntimeError, match="No storage configured"):
             fetcher.fetch_and_store("https://example.com", "TestService")
 
-    def test_fetch_and_store_no_driver_raises_error(self):
-        """Test that RuntimeError is raised if driver is not initialized."""
+    @patch("utils.auth.QualerAPIFetcher.fetch")
+    def test_fetch_and_store_no_driver_raises_error(self, mock_fetch):
+        """Test that RuntimeError is raised if fetch fails (which checks driver)."""
+        # Mock fetch to raise RuntimeError
+        mock_fetch.side_effect = RuntimeError("No valid session")
+
         fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
         fetcher.driver = None
         fetcher.session = Mock()
         fetcher.storage = Mock()
 
-        with pytest.raises(RuntimeError, match="Driver or session not initialized"):
+        with pytest.raises(RuntimeError, match="No valid session"):
             fetcher.fetch_and_store("https://example.com", "TestService")

@@ -3,7 +3,6 @@
 import os
 import tempfile
 from persistence.storage import PostgresRawStorage, CSVStorage
-from persistence.schema import create_datadump_table
 
 
 class TestPostgresRawStorage:
@@ -12,7 +11,6 @@ class TestPostgresRawStorage:
     def test_store_response_success(self, db_url):
         """Test storing a response successfully."""
         storage = PostgresRawStorage(db_url)
-        create_datadump_table(storage.engine.connect())
 
         test_data = {
             "url": "https://example.com/api",
@@ -40,7 +38,6 @@ class TestPostgresRawStorage:
     def test_store_response_conflict_handling(self, db_url):
         """Test that duplicate inserts are handled gracefully with ON CONFLICT."""
         storage = PostgresRawStorage(db_url)
-        create_datadump_table(storage.engine.connect())
 
         test_data = {
             "url": "https://example.com/api",
@@ -68,7 +65,6 @@ class TestPostgresRawStorage:
     def test_run_sql_select(self, db_url):
         """Test running SELECT queries."""
         storage = PostgresRawStorage(db_url)
-        create_datadump_table(storage.engine.connect())
 
         # Insert test data
         storage.run_sql(
@@ -98,7 +94,6 @@ class TestPostgresRawStorage:
     def test_run_sql_insert_returns_none(self, db_url):
         """Test that INSERT queries return None (no rows)."""
         storage = PostgresRawStorage(db_url)
-        create_datadump_table(storage.engine.connect())
 
         result = storage.run_sql(
             """
@@ -247,3 +242,140 @@ class TestCSVStorage:
                 assert "response_body" in header
                 assert "request_headers" in header
                 assert "response_headers" in header
+
+
+class TestORMStorage:
+    """Tests for ORMStorage adapter with SQLAlchemy ORM models."""
+
+    def test_orm_store_response_success(self, db_url):
+        """Test storing a response with ORM adapter."""
+        from persistence.storage import ORMStorage
+        from persistence.models import APIResponse
+
+        storage = ORMStorage(db_url)
+
+        test_data = {
+            "url": "https://example.com/api",
+            "service": "test_service",
+            "method": "GET",
+            "request_headers": {"User-Agent": "TestClient/1.0"},
+            "response_body": '{"status": "ok"}',
+            "response_headers": {"Content-Type": "application/json"},
+        }
+
+        storage.store_response(**test_data)
+
+        # Verify data was stored using ORM query
+        session = storage.Session()
+        response = session.query(APIResponse).filter(APIResponse.url == test_data["url"]).first()
+        assert response is not None
+        assert response.service == test_data["service"]
+        assert response.method == test_data["method"]
+        assert response.request_header == test_data["request_headers"]
+        assert response.response_body == test_data["response_body"]
+        assert response.response_header == test_data["response_headers"]
+        assert response.parsed is False
+
+        session.close()
+        storage.close()
+
+    def test_orm_store_response_conflict_handling(self, db_url):
+        """Test that duplicate ORM inserts are handled gracefully."""
+        from persistence.storage import ORMStorage
+        from persistence.models import APIResponse
+
+        storage = ORMStorage(db_url)
+
+        test_data = {
+            "url": "https://example.com/api",
+            "service": "test_service",
+            "method": "GET",
+            "request_headers": {"User-Agent": "TestClient/1.0"},
+            "response_body": '{"status": "ok"}',
+            "response_headers": {"Content-Type": "application/json"},
+        }
+
+        # Store same data twice
+        storage.store_response(**test_data)
+        storage.store_response(**test_data)  # Should not raise error
+
+        # Verify only one record exists
+        session = storage.Session()
+        count = session.query(APIResponse).filter(APIResponse.url == test_data["url"]).count()
+        assert count == 1
+
+        session.close()
+        storage.close()
+
+    def test_orm_to_dict_conversion(self, db_url):
+        """Test ORM model to_dict() method."""
+        from persistence.storage import ORMStorage
+        from persistence.models import APIResponse
+
+        storage = ORMStorage(db_url)
+
+        test_data = {
+            "url": "https://example.com/api",
+            "service": "test_service",
+            "method": "POST",
+            "request_headers": {"Authorization": "Bearer token"},
+            "response_body": '{"id": 123}',
+            "response_headers": {"X-RateLimit": "1000"},
+        }
+
+        storage.store_response(**test_data)
+
+        session = storage.Session()
+        response = session.query(APIResponse).filter(APIResponse.url == test_data["url"]).first()
+
+        data_dict = response.to_dict()
+        assert data_dict["url"] == test_data["url"]
+        assert data_dict["service"] == test_data["service"]
+        assert data_dict["method"] == test_data["method"]
+        assert data_dict["request_header"] == test_data["request_headers"]
+        assert data_dict["response_body"] == test_data["response_body"]
+        assert data_dict["response_header"] == test_data["response_headers"]
+        assert "created_at" in data_dict
+        assert data_dict["created_at"] is not None
+
+        session.close()
+        storage.close()
+
+    def test_orm_special_characters_handling(self, db_url):
+        """Test ORM storage handles special characters in JSON correctly."""
+        from persistence.storage import ORMStorage
+        from persistence.models import APIResponse
+
+        storage = ORMStorage(db_url)
+
+        test_data = {
+            "url": "https://example.com/api",
+            "service": "test_service",
+            "method": "GET",
+            "request_headers": {
+                "Accept": "application/json",
+                "X-Custom": "test\"quote's",
+            },
+            "response_body": '{"message": "Success with \\"quotes\\""}',
+            "response_headers": {"Content-Type": "application/json; charset=utf-8"},
+        }
+
+        storage.store_response(**test_data)
+
+        session = storage.Session()
+        response = session.query(APIResponse).filter(APIResponse.url == test_data["url"]).first()
+
+        # Verify special characters are preserved
+        assert response.request_header["X-Custom"] == "test\"quote's"
+        assert "charset=utf-8" in response.response_header["Content-Type"]
+
+        session.close()
+        storage.close()
+
+    def test_orm_close_idempotent(self, db_url):
+        """Test ORM storage close() can be called multiple times safely."""
+        from persistence.storage import ORMStorage
+
+        storage = ORMStorage(db_url)
+        storage.close()
+        storage.close()  # Should not raise errors

@@ -2,38 +2,86 @@
 
 import pytest
 import os
-from testcontainers.postgres import PostgresContainer
+import time
 
 
 @pytest.fixture(scope="session")
-def postgres_container():
-    """
-    Provide a PostgreSQL testcontainer for tests requiring a database.
+def _postgres_container_session():
+    """Start PostgreSQL container once per session."""
+    # Use fixed database on port 5433
+    connection_url = "postgresql://postgres:postgres@localhost:5433/test_qualer"
 
-    The container is started once per test session and cleaned up automatically.
-    Tests can access the connection URL via the fixture.
+    # Wait for database to be ready with retries
+    max_retries = 10
+    retry_delay = 1
+    for attempt in range(max_retries):
+        try:
+            from sqlalchemy import create_engine, text
+
+            engine = create_engine(connection_url)
+            with engine.begin() as conn:
+                conn.execute(text("SELECT 1"))
+            engine.dispose()
+            break  # Connection successful
+        except Exception as e:
+            if attempt == max_retries - 1:
+                raise RuntimeError(f"Database not ready after {max_retries} retries: {e}")
+            time.sleep(retry_delay)
+
+    # Enable hstore extension
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(connection_url)
+    with engine.begin() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS hstore"))
+    engine.dispose()
+
+    yield connection_url
+
+
+@pytest.fixture
+def postgres_container(_postgres_container_session):
+    """
+    Provide a clean PostgreSQL database for each test.
+
+    Cleans up tables before each test to ensure isolated test state.
     """
     # Skip if running without database tests
     if os.getenv("SKIP_DB_TESTS"):
         pytest.skip("Database tests disabled")
 
-    with PostgresContainer("postgres:16") as postgres:
-        # Set up database schema
-        connection_url = postgres.get_connection_url()
+    connection_url = _postgres_container_session
 
-        # Create tables needed for tests
-        from sqlalchemy import create_engine
-        from persistence.schema import create_datadump_table
+    # Set up clean database schema for this test using Alembic
+    from sqlalchemy import create_engine, text
+    from alembic import command
+    from alembic.config import Config
 
-        engine = create_engine(connection_url)
+    engine = create_engine(connection_url)
 
-        with engine.begin() as conn:
-            # Create datadump table (used by PostgresRawStorage)
-            create_datadump_table(conn)
+    with engine.begin() as conn:
+        # Drop all tables for clean state
+        conn.execute(text("DROP TABLE IF EXISTS api_response CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS datadump CASCADE"))
+        conn.execute(text("DROP TABLE IF EXISTS alembic_version CASCADE"))
 
-        engine.dispose()
+    engine.dispose()
 
-        yield connection_url
+    # Run Alembic migrations to create fresh schema
+    import pathlib
+    
+    project_root = pathlib.Path(__file__).parent.parent
+    alembic_ini_path = project_root / "alembic.ini"
+    
+    alembic_cfg = Config(str(alembic_ini_path))
+    alembic_cfg.set_main_option("sqlalchemy.url", connection_url)
+    
+    # Stamp the database as being at "base" (no migrations) so upgrade works
+    command.stamp(alembic_cfg, "base")
+    # Now run all migrations
+    command.upgrade(alembic_cfg, "head")
+
+    yield connection_url
 
 
 @pytest.fixture

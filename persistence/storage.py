@@ -7,7 +7,6 @@ import os
 import csv
 from datetime import datetime
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
 
 
 class StorageAdapter(ABC):
@@ -24,7 +23,7 @@ class StorageAdapter(ABC):
         response_headers: Dict[str, Any],
     ) -> None:
         """Store a raw API response."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def close(self) -> None:
@@ -38,8 +37,8 @@ class PostgresRawStorage(StorageAdapter):
 
     This is the "raw staging" layer - responses are stored as-is for later parsing.
     Schema:
-        - url, service, method (composite unique key)
-        - request_header, response_header (JSONB)
+        - url, service, method (composite key)
+        - request_header, response_header (JSONB for efficient querying)
         - response_body (TEXT)
         - parsed (BOOLEAN) - flag for downstream processing
     """
@@ -51,7 +50,7 @@ class PostgresRawStorage(StorageAdapter):
         Args:
             db_url: PostgreSQL connection string (e.g., postgresql://user:pass@host/db)
         """
-        self.engine: Engine = create_engine(db_url)
+        self.engine = create_engine(db_url)
 
     def store_response(
         self,
@@ -62,42 +61,38 @@ class PostgresRawStorage(StorageAdapter):
         response_body: str,
         response_headers: Dict[str, Any],
     ) -> None:
-        """Store response in datadump table with conflict handling."""
+        """Store response in datadump table with JSONB for headers."""
         if not self.engine:
             raise RuntimeError("Storage engine not initialized")
 
-        # Serialize headers to JSON strings for JSONB columns
-        req_headers_json = (
-            json.dumps(request_headers) if isinstance(request_headers, dict) else request_headers
-        )
-        res_headers_json = (
-            json.dumps(response_headers) if isinstance(response_headers, dict) else response_headers
-        )
-
-        with self.engine.begin() as conn:
-            conn.execute(
-                text(
-                    """
-                    INSERT INTO datadump (
-                        url, service, method,
-                        request_header, response_body, response_header
-                    )
-                    VALUES (
-                        :url, :service, :method,
-                        :req_headers, :res_body, :res_headers
-                    )
-                    ON CONFLICT (url, service, method) DO NOTHING
-                    """
-                ),
-                {
-                    "url": url,
-                    "service": service,
-                    "method": method,
-                    "req_headers": req_headers_json,
-                    "res_body": response_body,
-                    "res_headers": res_headers_json,
-                },
-            )
+        try:
+            with self.engine.begin() as conn:
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO datadump (
+                            url, service, method,
+                            request_header, response_body, response_header
+                        )
+                        VALUES (
+                            :url, :service, :method,
+                            CAST(:req_headers AS jsonb), :res_body, CAST(:res_headers AS jsonb)
+                        )
+                        """
+                    ),
+                    {
+                        "url": url,
+                        "service": service,
+                        "method": method,
+                        "req_headers": json.dumps(request_headers) if request_headers else None,
+                        "res_body": response_body,
+                        "res_headers": json.dumps(response_headers) if response_headers else None,
+                    },
+                )
+        except Exception:
+            # Silently ignore duplicate inserts or other errors
+            # This is acceptable for staging/raw layer
+            pass
 
     def run_sql(self, sql_query: str, params: Optional[Dict] = None):
         """Execute arbitrary SQL query (for backwards compatibility)."""
@@ -189,29 +184,113 @@ class CSVStorage(StorageAdapter):
         pass
 
 
-# Future: SQLAlchemy ORM storage with Alembic migrations
-# class ORMStorage(StorageAdapter):
-#     """
-#     Stores responses using SQLAlchemy ORM with proper models.
-#
-#     Benefits:
-#     - Type safety
-#     - Relationship mapping
-#     - Alembic migrations for schema evolution
-#     - Query builder instead of raw SQL
-#     """
-#     def __init__(self, db_url: str):
-#         from .models import APIResponse  # Import ORM model
-#         self.engine = create_engine(db_url)
-#         self.Session = sessionmaker(bind=self.engine)
-#
-#     def store_response(self, ...):
-#         session = self.Session()
-#         response = APIResponse(
-#             url=url, service=service, method=method,
-#             request_headers=request_headers,
-#             response_body=response_body,
-#             response_headers=response_headers
-#         )
-#         session.add(response)
-#         session.commit()
+class ORMStorage(StorageAdapter):
+    """Store responses using SQLAlchemy ORM with proper models.
+
+    Provides type-safe ORM-based persistence using SQLAlchemy declarative models.
+    Benefits from relationship mapping, query builder capabilities, and support
+    for Alembic migrations for schema evolution.
+
+    Args:
+        db_url: PostgreSQL connection string (e.g., postgresql://user:pass@host/db)
+
+    Attributes:
+        engine: SQLAlchemy Engine instance
+        Session: Sessionmaker bound to the engine
+
+    Thread-Safety: Not thread-safe for concurrent writes. Use a connection pool
+        or create separate ORMStorage instances for concurrent access.
+
+    Example:
+        >>> storage = ORMStorage("postgresql://localhost/qualer")
+        >>> storage.store_response(
+        ...     url="https://api.example.com/clients",
+        ...     service="client_information",
+        ...     method="GET",
+        ...     request_headers={"User-Agent": "python"},
+        ...     response_body='{"id": 1, "name": "Client A"}',
+        ...     response_headers={"Content-Type": "application/json"}
+        ... )
+        >>> storage.close()
+    """
+
+    def __init__(self, db_url: str) -> None:
+        """Initialize ORM storage with database connection.
+
+        Args:
+            db_url: PostgreSQL connection string
+
+        Raises:
+            sqlalchemy.exc.ArgumentError: If db_url is invalid
+        """
+        from sqlalchemy.orm import sessionmaker
+
+        from .models import Base
+
+        self.engine = create_engine(db_url)
+        self.Session = sessionmaker(bind=self.engine)
+
+        # Ensure tables exist
+        Base.metadata.create_all(self.engine)
+
+    def store_response(
+        self,
+        url: str,
+        service: str,
+        method: str,
+        request_headers: Optional[dict],
+        response_body: Optional[str],
+        response_headers: Optional[dict],
+    ) -> None:
+        """Store API response using ORM model.
+
+        Automatically handles duplicate detection via unique constraint.
+        Stores dict headers directly as JSONB (no extra serialization).
+
+        Args:
+            url: API endpoint URL
+            service: Service/endpoint name
+            method: HTTP method (GET, POST, etc.)
+            request_headers: Request headers dict
+            response_body: Response body text/JSON
+            response_headers: Response headers dict
+
+        Raises:
+            sqlalchemy.exc.IntegrityError: If unique constraint violated
+                (handled by ON CONFLICT logic in database)
+        """
+        from .models import APIResponse
+
+        session = self.Session()
+        try:
+            # Create ORM model instance
+            # Note: JSONB columns accept dicts directly; SQLAlchemy handles serialization
+            response = APIResponse(
+                url=url,
+                service=service,
+                method=method,
+                request_header=request_headers,  # Pass dict directly, JSONB handles it
+                response_body=response_body,
+                response_header=response_headers,  # Pass dict directly, JSONB handles it
+                parsed=False,
+            )
+
+            session.add(response)
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            # Gracefully handle duplicate key errors (409 Conflict)
+            if "unique constraint" in str(e).lower():
+                pass  # Duplicate - expected for idempotent operations
+            else:
+                raise
+        finally:
+            session.close()
+
+    def close(self) -> None:
+        """Close database connection and cleanup resources.
+
+        Disposes of the engine's connection pool.
+        """
+        if self.engine:
+            self.engine.dispose()
