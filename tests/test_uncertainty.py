@@ -46,7 +46,6 @@ def test_run_sql(db_url):
     storage.close()
 
 
-@pytest.mark.skip(reason="Live API data changes frequently - requires Qualer credentials")
 def test_uncertainty_parameters(qualer_api):
     """Test fetching uncertainty parameters from live API."""
     url = "https://jgiquality.qualer.com/work/Uncertainties/UncertaintyParameters?measurementId=89052138&uncertaintyBudgetId=8001"
