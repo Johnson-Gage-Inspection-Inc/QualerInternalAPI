@@ -99,7 +99,6 @@ class QualerClient:
         # Initialize endpoint namespaces
         self.client_dashboard = ClientDashboardEndpoint(self._api)
         self.client = ClientEndpoint(self._api)
-        assert self.client_dashboard is not None
 
         return self
 
