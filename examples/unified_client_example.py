@@ -18,7 +18,8 @@ def example_basic_usage():
         # Fetch all clients using the unified interface
         print("Fetching all clients...")
         clients_response = client.client_dashboard.clients_read()
-        clients = clients_response.get("data", [])
+        # API returns "Data" (capital D) in the response
+        clients = clients_response.get("Data", [])
         print(f"✓ Found {len(clients)} clients")
 
         if clients:
@@ -34,7 +35,7 @@ def example_fetch_and_store():
         # Fetch all clients
         print("Fetching clients...")
         clients_response = client.client_dashboard.clients_read()
-        clients = clients_response.get("data", [])
+        clients = clients_response.get("Data", [])
         client_ids = [c["Id"] for c in clients]
         print(f"✓ Found {len(client_ids)} clients")
 
@@ -54,7 +55,7 @@ def example_full_workflow():
         # Step 1: Fetch clients
         print("Step 1: Fetching clients from Qualer...")
         clients_response = client.client_dashboard.clients_read()
-        clients = clients_response.get("data", [])
+        clients = clients_response.get("Data", [])
         print(f"  ✓ Found {len(clients)} clients")
 
         # Step 2: Save to data/clients.json for other scripts
@@ -79,11 +80,11 @@ def example_with_custom_options():
     print("-" * 50)
 
     # See the browser during execution
-    print("Opening browser (headless=False)...")
+    print("Opening browser (headless=False) for 10 seconds after login...")
     with QualerClient(headless=False, login_wait_time=10.0) as client:
         print("Fetching clients...")
         clients_response = client.client_dashboard.clients_read()
-        clients = clients_response.get("data", [])
+        clients = clients_response.get("Data", [])
         print(f"✓ Found {len(clients)} clients")
 
 

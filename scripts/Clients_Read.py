@@ -6,6 +6,7 @@ complete list of clients and save the response as JSON.
 """
 
 import json
+import os
 
 from qualer_internal_sdk.endpoints.client_dashboard import clients_read
 
@@ -15,6 +16,9 @@ def main():
     print("Fetching clients from Qualer...")
 
     clients_data = clients_read()
+
+    # Ensure data directory exists
+    os.makedirs("data", exist_ok=True)
 
     # Save to file
     with open("data/clients.json", "w", encoding="utf-8") as f:

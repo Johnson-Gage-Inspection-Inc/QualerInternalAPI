@@ -17,7 +17,7 @@ def clients_read(page_size: int = 1000000) -> dict:
     Returns:
         Dictionary containing the API response with client data
     """
-    with QualerAPIFetcher(headless=False) as api:
+    with QualerAPIFetcher() as api:
         # Navigate to clients page first to establish proper browser context and cookies
         print("Navigating to clients page...")
         if not api.driver:

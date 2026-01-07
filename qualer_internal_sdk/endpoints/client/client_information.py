@@ -24,7 +24,12 @@ def fetch_and_store(client_ids: list, api: QualerAPIFetcher = None) -> None:
     def _do_fetch(fetcher):
         for clientid in tqdm(client_ids, desc="Fetching client data", dynamic_ncols=True):
             url = f"https://jgiquality.qualer.com/Client/ClientInformation?clientId={clientid}"
-            fetcher.fetch_and_store(url, "ClientInformation")
+            try:
+                fetcher.fetch_and_store(url, "ClientInformation")
+            except Exception as e:
+                # Skip clients with permission errors or other failures
+                print(f"\nWarning: Failed to fetch client {clientid}: {e}")
+                continue
 
     if api:
         _do_fetch(api)
@@ -45,7 +50,11 @@ def main(clients_file: str = "data/clients.json") -> None:
         data = json.load(f)
 
     # Extract client IDs from API response format
-    client_list = data.get("data", []) if isinstance(data, dict) else data
+    # Support both legacy "Data" and newer "data" key casing from the API
+    if isinstance(data, dict):
+        client_list = data.get("data") or data.get("Data") or []
+    else:
+        client_list = data
     client_ids = [c["Id"] for c in client_list]
     print(f"Loaded {len(client_ids)} clients from {clients_file}")
 

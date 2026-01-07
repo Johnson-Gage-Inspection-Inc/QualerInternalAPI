@@ -129,6 +129,11 @@ class QualerAPIFetcher:
 
         # First, get response headers from requests to check Content-Type
         r = self.session.get(url)
+        # Handle HTTP errors early to avoid inserting error pages into the database.
+        # Skip 403s gracefully in bulk operations, per project conventions.
+        if r.status_code == 403:
+            return
+        r.raise_for_status()
         content_type = r.headers.get("Content-Type", "").lower()
 
         # Use Selenium to get the actual response body (handles JavaScript-rendered content)
@@ -136,7 +141,7 @@ class QualerAPIFetcher:
         response_body = self.driver.page_source
 
         # If JSON response, try to extract from <pre> tag; otherwise store raw HTML
-        if "application/json" == content_type or "json" in content_type:
+        if content_type.startswith("application/json") or "json" in content_type:
             soup = BeautifulSoup(response_body, "html.parser")
             pre = soup.find("pre")
             if pre:
@@ -150,7 +155,7 @@ class QualerAPIFetcher:
                     """
                     INSERT INTO datadump (url, service, method, request_header, response_body, response_header)
                     VALUES (:url, :service, :method, :req_headers, :res_body, :res_headers)
-                    ON CONFLICT DO NOTHING
+                    ON CONFLICT (url, service, method) DO NOTHING
                     """
                 ),
                 {

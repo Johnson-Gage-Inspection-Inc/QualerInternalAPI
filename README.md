@@ -10,10 +10,11 @@ from qualer_internal_sdk import QualerClient
 with QualerClient() as client:
     # Fetch all clients
     clients = client.client_dashboard.clients_read()
-    print(f"Found {len(clients.get('data', []))} clients")
+    # API returns "Data" (capital D) in the response
+    print(f"Found {len(clients.get('Data', []))} clients")
 
     # Fetch client information
-    client_ids = [c["Id"] for c in clients["data"]]
+    client_ids = [c["Id"] for c in clients["Data"]]
     client.client.fetch_and_store(client_ids)
 ```
 
