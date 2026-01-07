@@ -46,6 +46,29 @@ jobs:
                   pip install -r requirements.txt
                   pip install -e .
 
+            - name: Check Alembic migration history is linear
+              run: |
+                  # Verify no branching in migration history
+                  alembic branches
+                  # If branches exist, alembic branches will show output and we should fail
+                  if [ -n "$(alembic branches)" ]; then
+                    echo "ERROR: Migration history has branches. Please merge migrations into a linear history."
+                    exit 1
+                  fi
+                  echo "✓ Migration history is linear"
+
+            - name: Validate Alembic migrations
+              env:
+                  DB_URL: postgresql://postgres:postgres@localhost:5433/test_qualer
+              run: |
+                  # Check current state
+                  alembic current
+                  # Apply all migrations to verify they work
+                  alembic upgrade head
+                  # Verify we reached head
+                  alembic current | grep -q "(head)" || (echo "ERROR: Failed to reach head revision" && exit 1)
+                  echo "✓ All migrations applied successfully"
+
             - name: Run tests with testcontainers
               run: |
                   pytest --tb=short -v
