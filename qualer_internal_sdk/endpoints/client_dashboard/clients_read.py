@@ -1,5 +1,7 @@
 """Fetch all clients from Qualer ClientDashboard API."""
 
+from typing import cast
+
 from utils.auth import QualerAPIFetcher
 from .types import FilterType, SortField, SortOrder
 from .response_types import ClientsReadResponse
@@ -45,17 +47,20 @@ def clients_read(
         >>> print(f"Fetched {len(response['Data'])} of {response['Total']} clients")
     """
     with QualerAPIFetcher() as api:
-        return api.fetch_via_browser(
-            method="POST",
-            endpoint_path="/ClientDashboard/Clients_Read",
-            auth_context_page="/clients",
-            params={
-                "sort": f"{sort_by.value}-{sort_order.value}",
-                "page": page,
-                "pageSize": page_size,
-                "group": group,
-                "filter": filter_str,
-                "search": search,
-                "filterType": filter_type.value,
-            },
+        return cast(
+            ClientsReadResponse,
+            api.fetch_via_browser(
+                method="POST",
+                endpoint_path="/ClientDashboard/Clients_Read",
+                auth_context_page="/clients",
+                params={
+                    "sort": f"{sort_by.value}-{sort_order.value}",
+                    "page": page,
+                    "pageSize": page_size,
+                    "group": group,
+                    "filter": filter_str,
+                    "search": search,
+                    "filterType": filter_type.value,
+                },
+            ),
         )

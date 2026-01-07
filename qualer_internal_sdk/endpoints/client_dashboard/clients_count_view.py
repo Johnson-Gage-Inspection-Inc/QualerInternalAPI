@@ -1,5 +1,7 @@
 """Fetch client counts by filter type from Qualer ClientDashboard API."""
 
+from typing import cast
+
 from utils.auth import QualerAPIFetcher
 from .types import FilterType
 from .response_types import ClientsCountViewResponse
@@ -28,9 +30,12 @@ def clients_count_view(
         >>> print(f"Inactive clients: {counts['view']['Inactive']}")
     """
     with QualerAPIFetcher() as api:
-        return api.fetch_via_browser(
-            method="GET",
-            endpoint_path="/ClientDashboard/ClientsCountView",
-            auth_context_page="/ClientDashboard/Clients",
-            params={"Search": search, "FilterType": filter_type.value},
+        return cast(
+            ClientsCountViewResponse,
+            api.fetch_via_browser(
+                method="GET",
+                endpoint_path="/ClientDashboard/ClientsCountView",
+                auth_context_page="/ClientDashboard/Clients",
+                params={"Search": search, "FilterType": filter_type.value},
+            ),
         )
