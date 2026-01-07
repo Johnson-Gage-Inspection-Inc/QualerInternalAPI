@@ -19,7 +19,7 @@ def clients_read(page_size: int = 1000000) -> dict:
     Returns:
         Dictionary containing the API response with client data
     """
-    with QualerAPIFetcher(headless=False) as api:
+    with QualerAPIFetcher() as api:
         # Navigate to clients page first to establish proper browser context and cookies
         print("Navigating to clients page...")
         if not api.driver:
@@ -64,6 +64,7 @@ def clients_read(page_size: int = 1000000) -> dict:
             "x-requested-with": "XMLHttpRequest",
         }
 
+        response = None
         try:
             if not api.session:
                 raise RuntimeError("Failed to establish authenticated session")
@@ -73,8 +74,8 @@ def clients_read(page_size: int = 1000000) -> dict:
             return response.json()
         except Exception as e:
             print(f"Error fetching clients: {e}")
-            print(f"Response status: {response.status_code if 'response' in locals() else 'N/A'}")
-            if "response" in locals():
+            if response is not None:
+                print(f"Response status: {response.status_code}")
                 print(f"Response text: {response.text[:500]}")
             raise
 
@@ -84,6 +85,10 @@ def main():
     print("Fetching clients from Qualer...")
 
     clients_data = clients_read()
+
+    # Ensure data directory exists
+    import os
+    os.makedirs("data", exist_ok=True)
 
     # Save to file
     with open("data/clients.json", "w", encoding="utf-8") as f:

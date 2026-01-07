@@ -136,7 +136,7 @@ class QualerAPIFetcher:
         response_body = self.driver.page_source
 
         # If JSON response, try to extract from <pre> tag; otherwise store raw HTML
-        if "application/json" == content_type or "json" in content_type:
+        if content_type.startswith("application/json") or "json" in content_type:
             soup = BeautifulSoup(response_body, "html.parser")
             pre = soup.find("pre")
             if pre:
@@ -241,12 +241,12 @@ class QualerAPIFetcher:
         """
         # Look for __RequestVerificationToken in hidden input
         # Pattern allows for attributes like type="hidden" between name and value
-        match = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', html)
+        match = re.search(r'name="__RequestVerificationToken"[^>]*?value="([^"]+)"', html)
         if match:
             return match.group(1)
 
         # Try alternate pattern (value before name)
-        match = re.search(r'value="([^"]+)"[^>]*name="__RequestVerificationToken"', html)
+        match = re.search(r'value="([^"]+)"[^>]*?name="__RequestVerificationToken"', html)
         if match:
             return match.group(1)
 

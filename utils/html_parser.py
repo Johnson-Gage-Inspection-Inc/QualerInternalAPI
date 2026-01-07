@@ -17,7 +17,9 @@ def extract_form_fields(html: str, form_id: str) -> Dict[str, Any]:
 
     Returns:
         Dictionary mapping field names to their values.
-        Returns empty dict if form not found.
+        Returns empty dict if form not found. Callers should check for
+        empty results. For debugging support when forms are not found,
+        consider using extract_form_fields_safe() instead.
 
     Example:
         >>> html = '<form id="MyForm"><input name="field1" value="value1"></form>'

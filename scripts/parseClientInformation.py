@@ -25,8 +25,9 @@ def main():
     """Parse stored ClientInformation responses and export to CSV/JSON."""
     # Read only the response_body from datadump for ClientInformation
     df = pd.read_sql(
-        "SELECT response_body FROM datadump WHERE service = 'ClientInformation'",
+        "SELECT response_body FROM datadump WHERE service = :service",
         engine,
+        params={"service": "ClientInformation"},
     )
 
     if df.empty:
@@ -46,6 +47,9 @@ def main():
 
     # Convert to DataFrame and export
     parsed_df = pd.DataFrame(parsed_data)
+
+    # Ensure data directory exists
+    os.makedirs("data", exist_ok=True)
 
     # JSON
     parsed_df.to_json("data/client_information.json", orient="records", indent=2)
