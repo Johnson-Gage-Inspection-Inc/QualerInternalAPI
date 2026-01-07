@@ -60,6 +60,7 @@ def clients_read(page_size: int = 1000000) -> dict:
             "x-requested-with": "XMLHttpRequest",
         }
 
+        response = None
         try:
             if not api.session:
                 raise RuntimeError("Failed to establish authenticated session")
@@ -69,7 +70,7 @@ def clients_read(page_size: int = 1000000) -> dict:
             return response.json()
         except Exception as e:
             print(f"Error fetching clients: {e}")
-            print(f"Response status: {response.status_code if 'response' in locals() else 'N/A'}")
-            if "response" in locals():
+            if response is not None:
+                print(f"Response status: {response.status_code}")
                 print(f"Response text: {response.text[:500]}")
             raise
