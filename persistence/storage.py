@@ -66,6 +66,14 @@ class PostgresRawStorage(StorageAdapter):
         if not self.engine:
             raise RuntimeError("Storage engine not initialized")
 
+        # Serialize headers to JSON strings for JSONB columns
+        req_headers_json = (
+            json.dumps(request_headers) if isinstance(request_headers, dict) else request_headers
+        )
+        res_headers_json = (
+            json.dumps(response_headers) if isinstance(response_headers, dict) else response_headers
+        )
+
         with self.engine.begin() as conn:
             conn.execute(
                 text(
@@ -85,9 +93,9 @@ class PostgresRawStorage(StorageAdapter):
                     "url": url,
                     "service": service,
                     "method": method,
-                    "req_headers": request_headers,
+                    "req_headers": req_headers_json,
                     "res_body": response_body,
-                    "res_headers": response_headers,
+                    "res_headers": res_headers_json,
                 },
             )
 
