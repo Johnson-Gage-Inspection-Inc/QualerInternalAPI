@@ -5,7 +5,15 @@ from time import sleep
 from utils.auth import QualerAPIFetcher
 
 
-def clients_read(page_size: int = 1000000) -> dict:
+def clients_read(
+    sort: str = "ClientCompanyName-asc",
+    page: int = 1,
+    page_size: int = 1000000,
+    group: str = "",
+    filter: str = "",
+    search: str = "",
+    filter_type: str = "AllClients",
+) -> dict:
     """
     Fetch all clients from Qualer ClientDashboard API.
 
@@ -38,40 +46,21 @@ def clients_read(page_size: int = 1000000) -> dict:
 
         # Request parameters matching the web UI - MUST include CSRF token
         payload = {
-            "sort": "ClientCompanyName-asc",
-            "page": 1,
+            "sort": sort,
+            "page": page,
             "pageSize": page_size,
-            "group": "",
-            "filter": "",
-            "search": "",
-            "filterType": "AllClients",
+            "group": group,
+            "filter": filter,
+            "search": search,
+            "filterType": filter_type,
             "__RequestVerificationToken": csrf_token,  # CRITICAL: Include CSRF token
         }
 
-        # Headers for the API request
-        headers = {
-            "accept": "*/*",
-            "accept-encoding": "gzip, deflate, br, zstd",
-            "accept-language": "en-US,en;q=0.9",
-            "cache-control": "no-cache, must-revalidate",
-            "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "origin": "https://jgiquality.qualer.com",
-            "pragma": "no-cache",
-            "referer": clients_page_url,
-            "x-requested-with": "XMLHttpRequest",
-        }
-
-        response = None
         try:
-            if not api.session:
-                raise RuntimeError("Failed to establish authenticated session")
             print("Fetching client list...")
-            response = api.session.post(url, data=payload, headers=headers, timeout=30)
-            response.raise_for_status()
+            # Use api.post() for simplified header management - handles all standard headers
+            response = api.post(url, data=payload, referer=clients_page_url, timeout=30)
             return response.json()
         except Exception as e:
             print(f"Error fetching clients: {e}")
-            if response is not None:
-                print(f"Response status: {response.status_code}")
-                print(f"Response text: {response.text[:500]}")
             raise
