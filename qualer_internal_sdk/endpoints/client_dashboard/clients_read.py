@@ -20,8 +20,27 @@ class FilterType(str, Enum):
     AssetsPastDue = "AssetsPastDue"
 
 
+class SortField(str, Enum):
+    """Fields available for sorting clients."""
+
+    ClientCompanyName = "ClientCompanyName"
+    ClientAccountNumber = "ClientAccountNumber"
+    ContactName = "ContactName"
+    CreatedDate = "CreatedDate"
+    AssetCount = "AssetCount"
+    OrdersCount = "OrdersCount"
+
+
+class SortOrder(str, Enum):
+    """Sort direction."""
+
+    Ascending = "asc"
+    Descending = "desc"
+
+
 def clients_read(
-    sort: str = "ClientCompanyName-asc",
+    sort_by: SortField = SortField.ClientCompanyName,
+    sort_order: SortOrder = SortOrder.Ascending,
     page: int = 1,
     page_size: int = 1000000,
     group: str = "",
@@ -35,7 +54,11 @@ def clients_read(
     Endpoint: POST /ClientDashboard/Clients_Read
 
     Args:
-        sort: Sort order (e.g., "ClientCompanyName-asc", "ClientCompanyName-desc")
+        sort_by: Field to sort by (default: SortField.ClientCompanyName)
+            Options: ClientCompanyName, ClientAccountNumber, ContactName,
+            CreatedDate, AssetCount, OrdersCount
+        sort_order: Sort direction (default: SortOrder.Ascending)
+            Options: Ascending, Descending
         page: Page number for pagination (default: 1)
         page_size: Number of results per page (default: 1000000)
         group: Group filter value (default: empty string)
@@ -73,7 +96,7 @@ def clients_read(
 
         # Request parameters matching the web UI - MUST include CSRF token
         payload = {
-            "sort": sort,
+            "sort": f"{sort_by}-{sort_order}",
             "page": page,
             "pageSize": page_size,
             "group": group,
