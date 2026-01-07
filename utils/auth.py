@@ -132,6 +132,7 @@ class QualerAPIFetcher:
         # Handle HTTP errors early to avoid inserting error pages into the database.
         # Skip 403s gracefully in bulk operations, per project conventions.
         if r.status_code == 403:
+            print(f"Warning: 403 Forbidden when accessing {url}. Skipping.")
             return
         r.raise_for_status()
         content_type = r.headers.get("Content-Type", "").lower()

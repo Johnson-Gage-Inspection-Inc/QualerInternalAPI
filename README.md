@@ -56,7 +56,7 @@ from qualer_internal_sdk import QualerClient
 
 with QualerClient() as client:
     clients = client.client_dashboard.clients_read()
-    for c in clients["data"]:
+    for c in clients["Data"]:
         print(c["Name"])
 ```
 
@@ -66,7 +66,7 @@ with QualerClient() as client:
 with QualerClient() as client:
     # Fetch all clients
     clients_resp = client.client_dashboard.clients_read()
-    client_ids = [c["Id"] for c in clients_resp["data"]]
+    client_ids = [c["Id"] for c in clients_resp["Data"]]
     
     # Fetch detailed information
     client.client.fetch_and_store(client_ids)

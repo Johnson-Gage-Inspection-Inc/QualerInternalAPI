@@ -61,7 +61,7 @@ def example_full_workflow():
         # Step 2: Save to data/clients.json for other scripts
         print("Step 2: Saving client list to data/clients.json...")
         with open("data/clients.json", "w") as f:
-            json.dump({"clients": clients}, f, indent=2)
+            json.dump(clients_response, f, indent=2)
         print("  ✓ Client list saved")
 
         # Step 3: Fetch and store detailed information

@@ -38,7 +38,7 @@ class ClientEndpoint:
         Args:
             client_ids: List of client IDs to fetch
         """
-        client.client_information.fetch_and_store(client_ids, self.api)
+        client.fetch_client_information(client_ids, self.api)
 
 
 class QualerClient:
