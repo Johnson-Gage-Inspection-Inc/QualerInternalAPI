@@ -4,6 +4,8 @@ import pytest
 from utils.auth import QualerAPIFetcher
 import json
 
+from qualer_internal_sdk.schemas import UncertaintyParametersResponse
+
 
 @pytest.fixture
 def qualer_api():
@@ -19,13 +21,10 @@ def test_uncertainty_parameters(qualer_api):
 
     assert response.status_code == 200
     data = response.json()
-    # Validate expected schema
-    assert isinstance(data, dict)
-    assert "Success" in data
-    assert isinstance(data["Success"], bool)
-    assert "Parameters" in data
-    assert isinstance(data["Parameters"], list)
-    assert "MuParameters" in data
+    # Validate that response can be cast to the schema
+    result = UncertaintyParametersResponse.from_dict(data)
+    assert result.Success is not None
+    assert isinstance(result.Parameters, list)
 
 
 def test_run_sql(qualer_api):
@@ -46,9 +45,6 @@ def test_store(qualer_api):
 
     latest_response_body = qualer_api.run_sql("SELECT response_body FROM datadump;")[-1][0]
     stored_data = json.loads(latest_response_body)
-    # Validate stored data has expected schema
-    assert isinstance(stored_data, dict)
-    assert "Success" in stored_data
-    assert isinstance(stored_data["Success"], bool)
-    assert "Parameters" in stored_data
-    assert isinstance(stored_data["Parameters"], list)
+    # Validate that stored data can be cast to the schema
+    result = UncertaintyParametersResponse.from_dict(stored_data)
+    assert result.Success is not None
