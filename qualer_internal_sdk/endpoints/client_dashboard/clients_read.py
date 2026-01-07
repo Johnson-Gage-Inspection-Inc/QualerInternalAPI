@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 
 from utils.auth import QualerAPIFetcher
 from .types import FilterType, SortField, SortOrder
+from .response_types import ClientsReadResponse
 
 
 def clients_read(
@@ -16,7 +17,7 @@ def clients_read(
     filter_str: str = "",
     search: str = "",
     filter_type: FilterType = FilterType.AllClients,
-) -> dict:
+) -> ClientsReadResponse:
     """
     Fetch all clients from Qualer ClientDashboard API.
 
@@ -38,7 +39,8 @@ def clients_read(
             Hidden, AssetsDue, AssetsPastDue
 
     Returns:
-        Dictionary containing the API response with client data
+        ClientsReadResponse: Typed response with Data (list of client records),
+            Total (total count), AggregateResults, and Errors fields
 
     Raises:
         RuntimeError: If Selenium driver initialization fails
