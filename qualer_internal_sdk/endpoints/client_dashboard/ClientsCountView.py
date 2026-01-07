@@ -28,24 +28,9 @@ def clients_count_view(
         >>> print(f"Inactive clients: {counts['view']['Inactive']}")
     """
     with QualerAPIFetcher() as api:
-        # This endpoint requires execution within browser context
-        api.driver.get("https://jgiquality.qualer.com/clients")
-
-        url = "https://jgiquality.qualer.com/ClientDashboard/ClientsCountView"
-        params_str = f"search={search}&filterType={filter_type.value}"
-
-        # Use browser fetch API to maintain auth context
-        result = api.driver.execute_async_script(
-            f"""
-            var callback = arguments[arguments.length - 1];
-            fetch("{url}?{params_str}", {{
-                method: "GET",
-                headers: {api.get_headers()},
-                credentials: "include"
-            }})
-            .then(response => response.json())
-            .then(callback)
-            .catch(err => callback({{error: err.toString()}}));
-        """
+        return api.execute_endpoint(
+            method="GET",
+            endpoint_path="/ClientDashboard/ClientsCountView",
+            auth_context_page="/ClientDashboard/Clients",
+            params={"Search": search, "FilterType": filter_type.value},
         )
-        return result

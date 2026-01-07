@@ -448,3 +448,121 @@ class QualerAPIFetcher:
             print(f"HTML snippet:\n{html[:2000]}\n")
 
         raise ValueError("Could not find CSRF token in page")
+
+    def execute_endpoint(
+        self,
+        method: str,
+        endpoint_path: str,
+        auth_context_page: str,
+        params: dict,
+        include_csrf: Optional[bool] = None,
+    ) -> dict:
+        """
+        Execute a Qualer API endpoint using JavaScript fetch in authenticated browser context.
+
+        This is the standard pattern for calling Qualer's internal API. Direct HTTP requests
+        fail with 401 even with valid cookies because Qualer validates JavaScript execution context.
+
+        Args:
+            method: HTTP method - "GET" or "POST"
+            endpoint_path: API endpoint path (e.g., "/ClientDashboard/ClientsCountView")
+            auth_context_page: Page to navigate to for auth context (e.g., "/ClientDashboard/Clients")
+            params: Request parameters (query params for GET, form data for POST)
+            include_csrf: Whether to include CSRF token (default: True for POST, False for GET)
+
+        Returns:
+            Parsed JSON response from the endpoint
+
+        Raises:
+            RuntimeError: If driver not initialized or JavaScript execution fails
+
+        Example:
+            >>> response = api.execute_endpoint(
+            ...     method="GET",
+            ...     endpoint_path="/ClientDashboard/ClientsCountView",
+            ...     auth_context_page="/ClientDashboard/Clients",
+            ...     params={"Search": "", "FilterType": "AllClients"},
+            ... )
+        """
+        if not self.driver:
+            raise RuntimeError("Driver not initialized")
+
+        # Get base URL from current session
+        base_url = "https://jgiquality.qualer.com"
+
+        # Navigate to auth context page
+        self.driver.get(f"{base_url}{auth_context_page}")
+        sleep(3)  # Wait longer for JavaScript and AJAX to complete
+
+        # Auto-determine CSRF inclusion if not specified
+        if include_csrf is None:
+            include_csrf = method.upper() == "POST"
+
+        # Add CSRF token for POST requests
+        if include_csrf and method.upper() == "POST":
+            try:
+                csrf_token = self.extract_csrf_token(self.driver.page_source)
+                params["__RequestVerificationToken"] = csrf_token
+            except ValueError:
+                # Token not found - some endpoints may not require it
+                # or it may be injected differently. Proceed without it.
+                print("WARNING: No CSRF token found, proceeding without it...")
+                pass
+
+        # Build the request based on method
+        if method.upper() == "GET":
+            from urllib.parse import urlencode
+
+            query_string = urlencode(params)
+            url = f"{base_url}{endpoint_path}?{query_string}"
+
+            js_code = f"""
+            var callback = arguments[arguments.length - 1];
+            fetch('{url}', {{
+                method: 'GET',
+                headers: {{
+                    'x-requested-with': 'XMLHttpRequest'
+                }},
+                credentials: 'include'
+            }})
+            .then(response => response.json())
+            .then(data => callback(data))
+            .catch(error => callback({{error: error.toString()}}));
+            """
+        else:  # POST
+            from urllib.parse import urlencode
+
+            payload = urlencode(params)
+            url = f"{base_url}{endpoint_path}"
+
+            js_code = f"""
+            var callback = arguments[arguments.length - 1];
+            fetch('{url}', {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'x-requested-with': 'XMLHttpRequest'
+                }},
+                body: '{payload}',
+                credentials: 'include'
+            }})
+            .then(response => {{
+                if (!response.ok) {{
+                    return callback({{error: 'HTTP ' + response.status + ': ' + response.statusText}});
+                }}
+                return response.json();
+            }})
+            .then(data => {{
+                if (data && !data.error) {{
+                    callback(data);
+                }}
+            }})
+            .catch(error => callback({{error: error.toString()}}));
+            """
+
+        result = self.driver.execute_async_script(js_code)
+
+        if isinstance(result, dict) and "error" in result:
+            raise RuntimeError(f"JavaScript fetch failed: {result['error']}")
+
+        return result

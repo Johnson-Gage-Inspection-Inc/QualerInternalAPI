@@ -1,8 +1,5 @@
 """Fetch all clients from Qualer ClientDashboard API."""
 
-from time import sleep
-from urllib.parse import urlencode
-
 from utils.auth import QualerAPIFetcher
 from .types import FilterType, SortField, SortOrder
 from .response_types import ClientsReadResponse
@@ -42,67 +39,23 @@ def clients_read(
         ClientsReadResponse: Typed response with Data (list of client records),
             Total (total count), AggregateResults, and Errors fields
 
-    Raises:
-        RuntimeError: If Selenium driver initialization fails
-
-    Note:
-        This endpoint requires JavaScript execution in browser context.
-        Direct HTTP POST requests fail with 401 even with valid cookies/CSRF tokens.
+    Example:
+        >>> from qualer_internal_sdk.endpoints.client_dashboard import clients_read
+        >>> response = clients_read(page_size=10)
+        >>> print(f"Fetched {len(response['Data'])} of {response['Total']} clients")
     """
     with QualerAPIFetcher() as api:
-        # Navigate to clients page to establish authenticated browser context
-        print("Navigating to clients page...")
-        if not api.driver:
-            raise RuntimeError("Failed to initialize Selenium driver")
-        clients_page_url = "https://jgiquality.qualer.com/clients"
-        api.driver.get(clients_page_url)
-
-        # Give page time to load and render
-        sleep(3)
-
-        # Extract CSRF token from page
-        print("Extracting CSRF token...")
-        csrf_token = api.extract_csrf_token(api.driver.page_source)
-
-        url = "https://jgiquality.qualer.com/ClientDashboard/Clients_Read"
-
-        # Build POST payload
-        payload = {
-            "sort": f"{sort_by.value}-{sort_order.value}",
-            "page": page,
-            "pageSize": page_size,
-            "group": group,
-            "filter": filter_str,
-            "search": search,
-            "filterType": filter_type.value,
-            "__RequestVerificationToken": csrf_token,
-        }
-
-        # URL-encode payload for JavaScript fetch
-        payload_str = urlencode(payload)
-
-        print("Fetching client list...")
-        # Use JavaScript fetch to maintain browser authentication context
-        result = api.driver.execute_async_script(
-            f"""
-            var callback = arguments[arguments.length - 1];
-            fetch("{url}", {{
-                method: "POST",
-                headers: {{
-                    "accept": "*/*",
-                    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
-                    "x-requested-with": "XMLHttpRequest"
-                }},
-                body: "{payload_str}",
-                credentials: "include"
-            }})
-            .then(response => response.json())
-            .then(callback)
-            .catch(err => callback({{error: err.toString()}}));
-        """
+        return api.execute_endpoint(
+            method="POST",
+            endpoint_path="/ClientDashboard/Clients_Read",
+            auth_context_page="/clients",
+            params={
+                "sort": f"{sort_by.value}-{sort_order.value}",
+                "page": page,
+                "pageSize": page_size,
+                "group": group,
+                "filter": filter_str,
+                "search": search,
+                "filterType": filter_type.value,
+            },
         )
-
-        if result.get("error"):
-            raise RuntimeError(f"JavaScript fetch failed: {result['error']}")
-
-        return result
