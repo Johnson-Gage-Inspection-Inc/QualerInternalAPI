@@ -3,11 +3,14 @@
 Endpoint: GET /Client/ClientInformation
 """
 
+import json
+from typing import Optional
+
 from utils.auth import QualerAPIFetcher
 from tqdm import tqdm
 
 
-def fetch_and_store(client_ids: list, api: QualerAPIFetcher = None) -> None:
+def fetch_and_store(client_ids: list, api: Optional[QualerAPIFetcher] = None) -> None:
     """
     Fetch and store client information for all clients.
 
