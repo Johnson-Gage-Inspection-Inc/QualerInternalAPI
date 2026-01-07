@@ -39,7 +39,10 @@ def main():
                 api.fetch_and_store(url, "ClientInformation")
             except Exception as e:
                 # Skip clients with permission errors or other failures
+                import traceback
+
                 print(f"\nWarning: Failed to fetch client {client_id}: {e}")
+                print(f"Traceback: {traceback.format_exc()}")
                 continue
 
 

@@ -1,6 +1,5 @@
 """Tests for HTML parsing utilities."""
 
-import pytest
 from utils.html_parser import extract_form_fields, extract_form_fields_safe
 
 

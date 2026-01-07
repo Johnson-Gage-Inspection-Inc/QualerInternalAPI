@@ -6,6 +6,9 @@ and saves the response as JSON for use by other extraction scripts.
 """
 
 import json
+import os
+from time import sleep
+
 from utils.auth import QualerAPIFetcher
 
 
@@ -27,8 +30,6 @@ def clients_read(page_size: int = 1000000) -> dict:
         api.driver.get("https://jgiquality.qualer.com/clients")
 
         # Give page time to load and render
-        from time import sleep
-
         sleep(3)
 
         # Extract CSRF token from page source
@@ -87,7 +88,6 @@ def main():
     clients_data = clients_read()
 
     # Ensure data directory exists
-    import os
     os.makedirs("data", exist_ok=True)
 
     # Save to file
