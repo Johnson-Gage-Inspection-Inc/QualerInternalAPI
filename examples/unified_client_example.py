@@ -113,15 +113,11 @@ def example_full_workflow():
 
         # Step 4: Query service groups (example with mock IDs)
         print("Step 4: Fetch service groups...")
-        print(
-            "  (Skipped in example - requires valid service order item IDs)"
-        )
+        print("  (Skipped in example - requires valid service order item IDs)")
 
         # Step 5: Query uncertainty data (example with mock IDs)
         print("Step 5: Fetch uncertainty data...")
-        print(
-            "  (Skipped in example - requires valid measurement/budget IDs)"
-        )
+        print("  (Skipped in example - requires valid measurement/budget IDs)")
 
         print("\nWorkflow complete!")
 

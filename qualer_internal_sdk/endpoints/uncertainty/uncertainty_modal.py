@@ -12,7 +12,7 @@ from tqdm import tqdm
 class UncertaintyModalEndpoint:
     """Encapsulates uncertainty modal API endpoint operations."""
 
-    def __init__(self, session: Session, driver: Optional[WebDriver] = None):
+    def __init__(self, session: Optional[Session], driver: Optional[WebDriver] = None):
         """Initialize the UncertaintyModalEndpoint.
 
         Args:
@@ -43,7 +43,9 @@ class UncertaintyModalEndpoint:
         """
         results = {}
 
-        for measurement_id, batch_id in tqdm(measurement_batches, desc="Fetching uncertainty modals"):
+        for measurement_id, batch_id in tqdm(
+            measurement_batches, desc="Fetching uncertainty modals"
+        ):
             try:
                 result = self.get_modal(measurement_id, batch_id, service_name)
                 results[(measurement_id, batch_id)] = result
@@ -91,7 +93,11 @@ class UncertaintyModalEndpoint:
         if self.driver:
             self._store_response(url, response, service_name)
 
-        return response.json() if response.headers.get("content-type", "").lower().startswith("application/json") else {"raw": response.text[:500]}
+        return (
+            response.json()
+            if response.headers.get("content-type", "").lower().startswith("application/json")
+            else {"raw": response.text[:500]}
+        )
 
     def _store_response(self, url: str, response: Any, service_name: str) -> None:
         """Store API response in database."""

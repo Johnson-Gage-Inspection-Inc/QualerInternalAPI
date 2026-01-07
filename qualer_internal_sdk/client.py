@@ -5,7 +5,9 @@ from typing import Optional
 from utils.auth import QualerAPIFetcher
 from qualer_internal_sdk.endpoints import client_dashboard, client
 from qualer_internal_sdk.endpoints.service.service_groups import ServiceGroupsEndpoint
-from qualer_internal_sdk.endpoints.uncertainty.uncertainty_parameters import UncertaintyParametersEndpoint
+from qualer_internal_sdk.endpoints.uncertainty.uncertainty_parameters import (
+    UncertaintyParametersEndpoint,
+)
 from qualer_internal_sdk.endpoints.uncertainty.uncertainty_modal import UncertaintyModalEndpoint
 
 

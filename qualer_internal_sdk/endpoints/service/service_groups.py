@@ -12,7 +12,7 @@ from tqdm import tqdm
 class ServiceGroupsEndpoint:
     """Encapsulates service groups API endpoint operations."""
 
-    def __init__(self, session: Session, driver: Optional[WebDriver] = None):
+    def __init__(self, session: Optional[Session], driver: Optional[WebDriver] = None):
         """Initialize the ServiceGroupsEndpoint.
 
         Args:
