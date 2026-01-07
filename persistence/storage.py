@@ -95,9 +95,14 @@ class PostgresRawStorage(StorageAdapter):
         """Execute arbitrary SQL query (for backwards compatibility)."""
         if not self.engine:
             raise RuntimeError("Storage engine not initialized")
-        with self.engine.connect() as conn:
+
+        with self.engine.begin() as conn:
             result = conn.execute(text(sql_query), params or {})
-            return result.fetchall()
+
+            # Only fetch results for queries that return rows (SELECT, RETURNING, etc.)
+            if result.returns_rows:
+                return result.fetchall()
+            return None
 
     def close(self) -> None:
         """Dispose of SQLAlchemy engine."""
