@@ -84,7 +84,7 @@ class PostgresRawStorage(StorageAdapter):
                     )
                     VALUES (
                         :url, :service, :method,
-                        CAST(:req_headers AS jsonb), :res_body, CAST(:res_headers AS jsonb)
+                        CAST(:req_headers AS hstore), :res_body, CAST(:res_headers AS jsonb)
                     )
                     ON CONFLICT (url, service, method) DO NOTHING
                     """
