@@ -37,8 +37,8 @@ class PostgresRawStorage(StorageAdapter):
 
     This is the "raw staging" layer - responses are stored as-is for later parsing.
     Schema:
-        - url, service, method (composite unique key)
-        - request_header, response_header (JSONB)
+        - url, service, method (composite key)
+        - request_header, response_header (hstore - converted from JSON)
         - response_body (TEXT)
         - parsed (BOOLEAN) - flag for downstream processing
     """
