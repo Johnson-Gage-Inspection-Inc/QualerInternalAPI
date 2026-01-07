@@ -1,18 +1,45 @@
-from utils.auth import QualerAPIFetcher
-from tqdm import tqdm
+"""Fetch uncertainty parameters from Qualer and store in database.
 
-with QualerAPIFetcher() as api:
-    measurementIDs = api.run_sql("SELECT measurementid FROM measurements LIMIT 10;")
-    uncertaintyBudgetIDs = api.run_sql(
-        """SELECT "UncertaintyBudgetId" FROM uncertainty_budgets LIMIT 10;"""
-    )
-    for measurementID in tqdm(measurementIDs):
-        for uncertaintyBudgetID in uncertaintyBudgetIDs:
-            url = (
-                "https://jgiquality.qualer.com/work/Uncertainties/UncertaintyParameters?"
-                f"measurementId={measurementID[0]}&uncertaintyBudgetId={uncertaintyBudgetID[0]}"
+Uses the unified QualerClient interface to fetch uncertainty parameter data
+for all measurement and uncertainty budget combinations in the system.
+"""
+
+from qualer_internal_sdk import QualerClient
+
+
+def main():
+    """Fetch and store uncertainty parameters for all measurements."""
+    with QualerClient() as client:
+        # Query database for measurement IDs and uncertainty budget IDs
+        measurement_ids = [
+            row[0]
+            for row in client.uncertainty.api.run_sql(
+                "SELECT measurementid FROM measurements LIMIT 10;"
             )
-            try:
-                api.fetch_and_store(url, "UncertaintyParameters")
-            except Exception as e:
-                print(f"Error fetching {url}: {e}")
+        ]
+        budget_ids = [
+            row[0]
+            for row in client.uncertainty.api.run_sql(
+                """SELECT "UncertaintyBudgetId" FROM uncertainty_budgets LIMIT 10;"""
+            )
+        ]
+
+        print(
+            f"Fetching uncertainty parameters for {len(measurement_ids)} measurements "
+            f"and {len(budget_ids)} budgets..."
+        )
+
+        # Fetch parameters for all combinations
+        results = client.uncertainty.parameters.fetch_for_measurements(
+            measurement_ids, budget_ids, service_name="UncertaintyParameters"
+        )
+
+        successful = sum(1 for r in results.values() if "error" not in r)
+        failed = len(results) - successful
+        print(f"✓ Successfully fetched {successful} parameter sets")
+        if failed > 0:
+            print(f"⚠ Failed to fetch {failed} parameter sets")
+
+
+if __name__ == "__main__":
+    main()
