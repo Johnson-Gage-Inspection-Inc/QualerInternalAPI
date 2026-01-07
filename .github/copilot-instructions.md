@@ -33,13 +33,12 @@ Example: `getClientInformation.py` - fetches all client HTML forms, parses with 
 
 ### Running Scripts
 ```bash
+# Activate virtual environment (Once per terminal session)
+.venv\Scripts\Activate.ps1
+
 # First-time setup: install editable package
 pip install -e .
 pip install -r requirements.txt
-
-# Activate virtual environment
-.venv\Scripts\Activate.ps1
-
 # Run extraction script from any directory (imports work cleanly)
 python scripts/getClientInformation.py
 
