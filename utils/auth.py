@@ -205,48 +205,26 @@ class QualerAPIFetcher:
         """
         Fetch URL and store response using configured storage adapter.
 
-        The <pre> tag extraction is because Qualer wraps JSON responses in HTML.
-        When you request a JSON endpoint, it returns: <html><body><pre>{json}</pre></body></html>
-        We extract the JSON from the <pre> tag to store clean data.
-        """
-        if not self.driver or not self.session:
-            raise RuntimeError("Driver or session not initialized")
+        Combines fetch() (Selenium-based with <pre> tag extraction) and store()
+        to fetch HTML-wrapped JSON and store it in the configured backend.
 
+        Args:
+            url: Endpoint URL to fetch
+            service: Service name for storage organization
+            method: HTTP method for logging (default: "GET")
+
+        Raises:
+            RuntimeError: If driver, session, or storage not initialized
+        """
         if not self.storage:
             raise RuntimeError(
                 "No storage configured. Provide db_url or storage adapter to use fetch_and_store."
             )
 
-        # First, get response headers from requests to check Content-Type
-        r = self.session.get(url)
-        # Handle HTTP errors early to avoid inserting error pages into the database.
-        # Skip 403s gracefully in bulk operations, per project conventions.
-        if r.status_code == 403:
-            print(f"Warning: 403 Forbidden when accessing {url}. Skipping.")
-            return
-        r.raise_for_status()
-        content_type = r.headers.get("Content-Type", "").lower()
-
-        # Use Selenium to get the actual response body (handles JavaScript-rendered content)
-        self.driver.get(url)
-        response_body = self.driver.page_source
-
-        # If JSON response, try to extract from <pre> tag; otherwise store raw HTML
-        # NOTE: Qualer wraps JSON in <html><body><pre>{...}</pre></body></html>
-        if content_type.startswith("application/json") or "json" in content_type:
-            soup = BeautifulSoup(response_body, "html.parser")
-            if pre := soup.find("pre"):
-                response_body = pre.text.strip()
-
-        # Store using configured adapter (PostgreSQL, CSV, etc.)
-        self.storage.store_response(
-            url=url,
-            service=service,
-            method=method,
-            request_headers=dict(r.request.headers) if r.request else {},
-            response_body=response_body,
-            response_headers=dict(r.headers),
-        )
+        # Use fetch() to handle Selenium navigation and <pre> tag extraction
+        response = self.fetch(url)
+        # Use store() to save the response via the configured storage adapter
+        self.store(url, service, method, response)
 
     def store(self, url, service, method, response):
         """
