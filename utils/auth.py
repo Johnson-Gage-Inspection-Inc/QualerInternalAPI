@@ -77,9 +77,9 @@ class QualerAPIFetcher:
         # Authentication setup
         self.username = username or os.getenv("QUALER_EMAIL")
         self.password = password or os.getenv("QUALER_PASSWORD")
-        self.driver = None
+        self.driver: webdriver.Chrome
         self.headless = headless
-        self.session = None
+        self.session: requests.Session
         self.login_wait_time = float(os.getenv("QUALER_LOGIN_WAIT_TIME", login_wait_time))
 
     def __enter__(self):
@@ -96,7 +96,7 @@ class QualerAPIFetcher:
         """Called upon exiting the `with` block. Cleans up resources."""
         if self.driver:
             self.driver.quit()
-            self.driver = None
+            self.driver = None  # type: ignore
         if self.storage:
             self.storage.close()
 
