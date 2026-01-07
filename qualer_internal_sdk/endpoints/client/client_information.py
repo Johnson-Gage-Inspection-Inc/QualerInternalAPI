@@ -4,9 +4,9 @@ Endpoint: GET /Client/ClientInformation
 """
 
 from typing import Optional
+from tqdm import tqdm
 
 from utils.auth import QualerAPIFetcher
-from tqdm import tqdm
 
 
 def fetch_and_store(client_ids: list, api: Optional[QualerAPIFetcher] = None) -> None:
