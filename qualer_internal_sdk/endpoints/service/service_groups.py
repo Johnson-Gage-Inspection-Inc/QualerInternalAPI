@@ -63,7 +63,7 @@ class ServiceGroupsEndpoint:
             API response as dictionary
 
         Raises:
-            RuntimeError: If session or driver is not available
+            RuntimeError: If session is not available
             requests.HTTPError: On HTTP errors
         """
         if not self.session:
@@ -77,18 +77,8 @@ class ServiceGroupsEndpoint:
         response = self.session.get(url, timeout=30)
         response.raise_for_status()
 
-        # Store in database if driver is available
-        if self.driver:
-            self._store_response(url, response, service_name)
-
         return (
             response.json()
             if response.headers.get("content-type", "").lower().startswith("application/json")
             else {"raw": response.text[:500]}
         )
-
-    def _store_response(self, url: str, response: Any, service_name: str) -> None:
-        """Store API response in database."""
-        # This would be implemented by the parent client's database access
-        # For now, just a placeholder for future integration
-        pass

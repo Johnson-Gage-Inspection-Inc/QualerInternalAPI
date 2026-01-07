@@ -1,4 +1,9 @@
 """Uncertainty Modal and Parameters endpoints."""
 
-# TODO: Implement uncertainty endpoints
-__all__ = []
+from .uncertainty_modal import UncertaintyModalEndpoint
+from .uncertainty_parameters import UncertaintyParametersEndpoint
+
+__all__ = [
+    "UncertaintyModalEndpoint",
+    "UncertaintyParametersEndpoint",
+]
