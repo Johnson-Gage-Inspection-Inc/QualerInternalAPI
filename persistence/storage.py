@@ -189,29 +189,128 @@ class CSVStorage(StorageAdapter):
         pass
 
 
-# Future: SQLAlchemy ORM storage with Alembic migrations
-# class ORMStorage(StorageAdapter):
-#     """
-#     Stores responses using SQLAlchemy ORM with proper models.
-#
-#     Benefits:
-#     - Type safety
-#     - Relationship mapping
-#     - Alembic migrations for schema evolution
-#     - Query builder instead of raw SQL
-#     """
-#     def __init__(self, db_url: str):
-#         from .models import APIResponse  # Import ORM model
-#         self.engine = create_engine(db_url)
-#         self.Session = sessionmaker(bind=self.engine)
-#
-#     def store_response(self, ...):
-#         session = self.Session()
-#         response = APIResponse(
-#             url=url, service=service, method=method,
-#             request_headers=request_headers,
-#             response_body=response_body,
-#             response_headers=response_headers
-#         )
-#         session.add(response)
-#         session.commit()
+class ORMStorage(StorageAdapter):
+    """Store responses using SQLAlchemy ORM with proper models.
+
+    Provides type-safe ORM-based persistence using SQLAlchemy declarative models.
+    Benefits from relationship mapping, query builder capabilities, and support
+    for Alembic migrations for schema evolution.
+
+    Args:
+        db_url: PostgreSQL connection string (e.g., postgresql://user:pass@host/db)
+
+    Attributes:
+        engine: SQLAlchemy Engine instance
+        Session: Sessionmaker bound to the engine
+
+    Thread-Safety: Not thread-safe for concurrent writes. Use a connection pool
+        or create separate ORMStorage instances for concurrent access.
+
+    Example:
+        >>> storage = ORMStorage("postgresql://localhost/qualer")
+        >>> storage.store_response(
+        ...     url="https://api.example.com/clients",
+        ...     service="client_information",
+        ...     method="GET",
+        ...     request_headers={"User-Agent": "python"},
+        ...     response_body='{"id": 1, "name": "Client A"}',
+        ...     response_headers={"Content-Type": "application/json"}
+        ... )
+        >>> storage.close()
+    """
+
+    def __init__(self, db_url: str) -> None:
+        """Initialize ORM storage with database connection.
+
+        Args:
+            db_url: PostgreSQL connection string
+
+        Raises:
+            sqlalchemy.exc.ArgumentError: If db_url is invalid
+        """
+        from sqlalchemy.orm import sessionmaker
+
+        from .models import Base
+
+        self.engine = create_engine(db_url)
+        self.Session = sessionmaker(bind=self.engine)
+
+        # Ensure tables exist
+        Base.metadata.create_all(self.engine)
+
+    def store_response(
+        self,
+        url: str,
+        service: str,
+        method: str,
+        request_headers: Optional[dict],
+        response_body: Optional[str],
+        response_headers: Optional[dict],
+    ) -> None:
+        """Store API response using ORM model.
+
+        Automatically handles duplicate detection via unique constraint.
+        Serializes dict headers to JSON strings before storage.
+
+        Args:
+            url: API endpoint URL
+            service: Service/endpoint name
+            method: HTTP method (GET, POST, etc.)
+            request_headers: Request headers dict
+            response_body: Response body text/JSON
+            response_headers: Response headers dict
+
+        Raises:
+            sqlalchemy.exc.IntegrityError: If unique constraint violated
+                (handled by ON CONFLICT logic in database)
+        """
+        from .models import APIResponse
+
+        # Serialize headers to JSON strings for storage
+        req_headers_json = (
+            json.dumps(request_headers) if isinstance(request_headers, dict) else request_headers
+        )
+        res_headers_json = (
+            json.dumps(response_headers) if isinstance(response_headers, dict) else response_headers
+        )
+
+        session = self.Session()
+        try:
+            # Create ORM model instance
+            response = APIResponse(
+                url=url,
+                service=service,
+                method=method,
+                request_header=(
+                    json.loads(req_headers_json)
+                    if isinstance(req_headers_json, str)
+                    else req_headers_json
+                ),
+                response_body=response_body,
+                response_header=(
+                    json.loads(res_headers_json)
+                    if isinstance(res_headers_json, str)
+                    else res_headers_json
+                ),
+                parsed=False,
+            )
+
+            session.add(response)
+            session.commit()
+        except Exception as e:
+            session.rollback()
+            # Gracefully handle duplicate key errors (409 Conflict)
+            if "unique constraint" in str(e).lower():
+                pass  # Duplicate - expected for idempotent operations
+            else:
+                raise
+        finally:
+            session.close()
+
+    def close(self) -> None:
+        """Close database connection and cleanup resources.
+
+        Disposes of the engine's connection pool.
+        """
+        if self.engine:
+            self.engine.dispose()

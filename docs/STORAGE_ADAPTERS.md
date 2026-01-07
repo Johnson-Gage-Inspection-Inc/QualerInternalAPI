@@ -12,7 +12,7 @@ QualerInternalAPI uses a pluggable storage adapter pattern to support multiple b
            ├──> StorageAdapter (ABC)
            │       ├─> PostgresRawStorage
            │       ├─> CSVStorage  
-           │       └─> ORMStorage (future)
+           │       └─> ORMStorage ✅
            │
            └──> fetch_and_store(url, service)
 ```
@@ -137,39 +137,84 @@ with QualerAPIFetcher(storage=storage) as api:
 
 ---
 
-## ORMStorage (Future Implementation)
+## ORMStorage
 
-**Purpose:** Type-safe ORM-based storage with schema evolution via Alembic.
+**Purpose:** Type-safe ORM-based storage with SQLAlchemy declarative models and Alembic migration support.
 
-**Status:** Scaffolded in `persistence/storage.py`
+**Status:** ✅ IMPLEMENTED
 
-**Planned Features:**
-- SQLAlchemy declarative models (type hints + relationships)
-- Alembic migrations for schema versioning
-- Query builder instead of raw SQL
-- Automatic schema validation
+**Design:**
+- Uses SQLAlchemy declarative models for type safety
+- Automatic table creation via `Base.metadata.create_all()`
+- Graceful duplicate handling (ON CONFLICT via database constraints)
+- Full relationship mapping support (future enhancement)
+- JSONB columns preserve complex data structures
 
-**Example (Future):**
+**Data Model (in `persistence/models.py`):**
 ```python
+class APIResponse(Base):
+    """ORM model for raw API responses."""
+    __tablename__ = "datadump"
+    
+    id = Column(Integer, primary_key=True)
+    url = Column(String, nullable=False)
+    service = Column(String, nullable=False)
+    method = Column(String, nullable=False)
+    request_header = Column(JSONB)          # Stored as JSONB
+    response_body = Column(Text)
+    response_header = Column(JSONB)         # Stored as JSONB
+    parsed = Column(Boolean, default=False)
+    created_at = Column(TIMESTAMP, server_default=func.current_timestamp())
+    
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {...}
+```
+
+**Usage Example:**
+```python
+from persistence.storage import ORMStorage
 from persistence.models import APIResponse
-from persistence import ORMStorage
+from sqlalchemy import select
 
-storage = ORMStorage("postgresql://...")
+# Initialize with automatic table creation
+storage = ORMStorage("postgresql://user:pass@localhost/qualer")
 
-# Type-safe storage
-response = APIResponse(
-    url="https://example.com",
-    service="ClientInfo",
+# Store responses (automatic ON CONFLICT handling)
+storage.store_response(
+    url="https://api.example.com/clients",
+    service="client_information",
     method="GET",
-    request_headers={"Authorization": "Bearer token"},
-    response_body=json.dumps({"id": 123}),
+    request_headers={"User-Agent": "python"},
+    response_body='{"id": 1, "name": "Client A"}',
     response_headers={"Content-Type": "application/json"}
 )
-storage.store(response)
 
-# Type-safe querying
-results = storage.query(APIResponse).filter_by(service="ClientInfo").all()
+# Query with ORM (type-safe)
+session = storage.Session()
+responses = session.query(APIResponse).filter(
+    APIResponse.service == "client_information",
+    APIResponse.parsed == False
+).all()
+
+for resp in responses:
+    print(f"URL: {resp.url}, Status: {resp.parsed}")
+    data_dict = resp.to_dict()  # Convert to dict
+    # ... process response ...
+
+session.close()
+storage.close()
 ```
+
+**Key Features:**
+- ✅ Type hints for all columns
+- ✅ Automatic JSONB serialization/deserialization
+- ✅ `to_dict()` method for JSON-safe export
+- ✅ Duplicate handling via unique constraint
+- ✅ Server-side timestamp (database-managed)
+- ✅ No external migration tool required for basic usage
+
+**Thread Safety:** Not thread-safe for concurrent writes. Use session pooling or create separate `ORMStorage` instances for concurrent access.
 
 ---
 
@@ -275,7 +320,7 @@ def test_my_storage(tmpdir):
 |---------|-----------|---------|-------------|----------|
 | PostgresRawStorage | 1000s/sec | ~10ms | ✅ Excellent | Production, concurrent loads |
 | CSVStorage | 100s/sec | ~5ms | ❌ Poor | Ad-hoc analysis, small datasets |
-| ORMStorage (future) | 100s/sec | ~20ms | ✅ Good | Complex queries, relationships |
+| ORMStorage | 100s/sec | ~20ms | ✅ Good | Complex queries, relationships |
 
 **Optimization Tips:**
 - Use batch inserts for bulk operations (>1000 records)
