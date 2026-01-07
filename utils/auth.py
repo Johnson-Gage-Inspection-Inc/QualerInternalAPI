@@ -8,11 +8,12 @@ from getpass import getpass
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from sqlalchemy import create_engine, text
 from bs4 import BeautifulSoup
 import json
 from dotenv import load_dotenv
 import re
+
+from persistence.storage import StorageAdapter, PostgresRawStorage
 
 load_dotenv()
 
@@ -28,39 +29,64 @@ class QualerAPIFetcher:
     def __init__(
         self,
         db_url: Optional[str] = None,
+        storage: Optional[StorageAdapter] = None,
         headless: bool = True,
         username: Optional[str] = None,
         password: Optional[str] = None,
         login_wait_time: float = 5.0,
     ):
         """
-        db_url: Full connection string to your Postgres database
-        username, password: Optionally provide credentials for Qualer. If not
-                           supplied, environment variables or interactive prompts
-                           will be used.
-        login_wait_time: Seconds to wait after login for page to load
-                        (configurable via QUALER_LOGIN_WAIT_TIME env var)
+        Initialize Qualer API authenticator with optional storage.
+
+        Args:
+            db_url: (Optional) PostgreSQL connection string. If provided, creates PostgresRawStorage.
+                    If omitted and no storage provided, DB operations will be disabled.
+            storage: (Optional) Custom storage adapter (PostgresRawStorage, CSVStorage, etc.)
+                     Overrides db_url if both provided.
+            headless: Run Selenium in headless mode (default: True)
+            username: Qualer username (reads from QUALER_EMAIL env var if not provided)
+            password: Qualer password (reads from QUALER_PASSWORD env var if not provided)
+            login_wait_time: Seconds to wait after login for page to load
+                            (configurable via QUALER_LOGIN_WAIT_TIME env var)
+
+        Examples:
+            # With database (backward compatible)
+            with QualerAPIFetcher(db_url="postgresql://...") as api:
+                api.fetch_and_store(url, "ClientInformation")
+
+            # With CSV storage (ad-hoc analysis)
+            from persistence import CSVStorage
+            with QualerAPIFetcher(storage=CSVStorage("data/")) as api:
+                api.fetch_and_store(url, "ClientInformation")
+
+            # Without storage (pure API client)
+            with QualerAPIFetcher() as api:
+                response = api.session.get(url)
         """
-        if not db_url:
+        # Storage setup
+        self.storage: Optional[StorageAdapter]
+        if storage:
+            self.storage = storage
+        elif db_url:
+            self.storage = PostgresRawStorage(db_url)
+        else:
+            # Try environment variable for backward compatibility
             db_url = os.getenv("DB_URL")
-        if not db_url:
-            raise EnvironmentError("DB_URL environment variable is not set")
-        self.db_url = db_url
-        self.username = username or os.getenv("QUALER_USERNAME")
+            self.storage = PostgresRawStorage(db_url) if db_url else None
+
+        # Authentication setup
+        self.username = username or os.getenv("QUALER_EMAIL")
         self.password = password or os.getenv("QUALER_PASSWORD")
         self.driver = None
         self.headless = headless
         self.session = None
-        self.engine = None
         self.login_wait_time = float(os.getenv("QUALER_LOGIN_WAIT_TIME", login_wait_time))
 
     def __enter__(self):
         """
-        Called upon entering the `with` block. Creates a DB engine, Selenium
-        driver, logs in to Qualer, and builds a requests.Session from
-        Selenium's cookies.
+        Called upon entering the `with` block. Initializes Selenium driver,
+        logs in to Qualer, and builds a requests.Session from Selenium's cookies.
         """
-        self.engine = create_engine(self.db_url)
         self._init_driver()
         self._login()
         self._build_requests_session()
@@ -71,9 +97,8 @@ class QualerAPIFetcher:
         if self.driver:
             self.driver.quit()
             self.driver = None
-        if self.engine:
-            self.engine.dispose()
-            self.engine = None
+        if self.storage:
+            self.storage.close()
 
     def _init_driver(self):
         """Initialize Chrome WebDriver."""
@@ -116,16 +141,37 @@ class QualerAPIFetcher:
             self.session.cookies.set(cookie["name"], cookie["value"])
 
     def run_sql(self, sql_query, params=None):
-        """Execute a SQL query and return all rows."""
-        assert self.engine is not None
-        with self.engine.connect() as conn:
-            result = conn.execute(text(sql_query), params or {})
-            return result.fetchall()
+        """
+        Execute a SQL query and return all rows.
+
+        Note: Only works with PostgresRawStorage. For other storage backends,
+        access the storage adapter directly.
+        """
+        if not self.storage:
+            raise RuntimeError(
+                "No storage configured. Provide db_url or storage adapter to use SQL."
+            )
+        if not isinstance(self.storage, PostgresRawStorage):
+            raise RuntimeError(
+                f"run_sql() only works with PostgresRawStorage, got {type(self.storage).__name__}"
+            )
+        return self.storage.run_sql(sql_query, params)
 
     def fetch_and_store(self, url, service, method="GET"):
-        """Fetch URL and insert response into datadump table."""
+        """
+        Fetch URL and store response using configured storage adapter.
+
+        The <pre> tag extraction is because Qualer wraps JSON responses in HTML.
+        When you request a JSON endpoint, it returns: <html><body><pre>{json}</pre></body></html>
+        We extract the JSON from the <pre> tag to store clean data.
+        """
         if not self.driver or not self.session:
             raise RuntimeError("Driver or session not initialized")
+
+        if not self.storage:
+            raise RuntimeError(
+                "No storage configured. Provide db_url or storage adapter to use fetch_and_store."
+            )
 
         # First, get response headers from requests to check Content-Type
         r = self.session.get(url)
@@ -142,68 +188,48 @@ class QualerAPIFetcher:
         response_body = self.driver.page_source
 
         # If JSON response, try to extract from <pre> tag; otherwise store raw HTML
+        # NOTE: Qualer wraps JSON in <html><body><pre>{...}</pre></body></html>
         if content_type.startswith("application/json") or "json" in content_type:
             soup = BeautifulSoup(response_body, "html.parser")
-            if pre := soup.find("pre"):  # HACK: What's the significance of <pre> here?
+            if pre := soup.find("pre"):
                 response_body = pre.text.strip()
 
-        # Store response to database
-        assert self.engine is not None
-        with self.engine.begin() as conn:
-            conn.execute(
-                text(
-                    """
-                    INSERT INTO datadump (url, service, method, request_header, response_body, response_header)
-                    VALUES (:url, :service, :method, :req_headers, :res_body, :res_headers)
-                    ON CONFLICT (url, service, method) DO NOTHING
-                    """
-                ),
-                {
-                    "url": url,
-                    "service": service,
-                    "method": method,
-                    "req_headers": dict(r.request.headers) if r.request else {},
-                    "res_body": response_body,
-                    "res_headers": dict(r.headers),
-                },
-            )
+        # Store using configured adapter (PostgreSQL, CSV, etc.)
+        self.storage.store_response(
+            url=url,
+            service=service,
+            method=method,
+            request_headers=dict(r.request.headers) if r.request else {},
+            response_body=response_body,
+            response_headers=dict(r.headers),
+        )
 
     def store(self, url, service, method, response):
-        """Store request/response in database."""
+        """
+        Store a requests.Response object using configured storage adapter.
+
+        This is a convenience method for storing responses obtained via
+        api.session.get() or api.fetch() methods.
+        """
+        if not self.storage:
+            raise RuntimeError(
+                "No storage configured. Provide db_url or storage adapter to use store."
+            )
+
         if not response.text:
             raise RuntimeError("Response body is empty. Did the request fail?")
-        if response.ok:
-            req_headers = dict(response.request.headers)
-            res_headers = dict(response.headers)
-            assert self.engine is not None
-            with self.engine.begin() as conn:
-                conn.execute(
-                    text(
-                        """
-                        INSERT INTO datadump (
-                            service, method, url,
-                            request_header, request_body,
-                            response_header, response_body
-                        )
-                        VALUES (
-                            :service, :method, :url,
-                            :req_headers, NULL,
-                            :res_headers, :res_body
-                        )
-                        ON CONFLICT DO NOTHING;
-                    """
-                    ),
-                    {
-                        "service": service,
-                        "method": method,
-                        "url": url,
-                        "req_headers": req_headers,
-                        "res_headers": res_headers,
-                        "res_body": response.text,
-                    },
-                )
-        else:
+
+        if not response.ok:
             raise RuntimeError(f"Request to {url} failed with status code {response.status_code}")
+
+        self.storage.store_response(
+            url=url,
+            service=service,
+            method=method,
+            request_headers=dict(response.request.headers),
+            response_body=response.text,
+            response_headers=dict(response.headers),
+        )
 
     def fetch(self, url):
         """Fetch URL using authenticated session."""

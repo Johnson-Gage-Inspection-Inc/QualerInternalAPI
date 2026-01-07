@@ -29,7 +29,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["utils", "qualer_internal_sdk*"]
+include = ["utils", "qualer_internal_sdk*", "persistence"]
 
 [tool.black]
 line-length = 100

@@ -37,7 +37,7 @@ Set environment variables in `.env`:
 DB_URL=postgresql://user:pass@host:5432/qualer
 
 # Qualer Credentials
-QUALER_USERNAME=user@example.com
+QUALER_EMAIL=user@example.com
 QUALER_PASSWORD=secret_password
 
 # Performance Tuning (optional)
@@ -67,10 +67,10 @@ with QualerClient() as client:
     # Fetch all clients
     clients_resp = client.client_dashboard.clients_read()
     client_ids = [c["Id"] for c in clients_resp["Data"]]
-    
+
     # Fetch detailed information
     client.client.fetch_and_store(client_ids)
-    
+
     # Parse and export (separate scripts)
     # python scripts/parseClientInformation.py
 ```
@@ -181,13 +181,13 @@ qualer_internal_sdk/endpoints/
 
 ## Key Features
 
-✅ **Unified Interface** - Single entry point with nested namespaces  
-✅ **Automatic Auth** - Context manager handles login/cleanup  
-✅ **Database Storage** - Fetch responses automatically stored in PostgreSQL  
-✅ **HTML Parsing** - Extract structured data from HTML forms  
-✅ **Content-Type Aware** - Handles both JSON and HTML responses  
-✅ **Flexible Config** - Environment variables or interactive prompts  
-✅ **Debugging Support** - Disable headless mode to watch browser  
+✅ **Unified Interface** - Single entry point with nested namespaces
+✅ **Automatic Auth** - Context manager handles login/cleanup
+✅ **Database Storage** - Fetch responses automatically stored in PostgreSQL
+✅ **HTML Parsing** - Extract structured data from HTML forms
+✅ **Content-Type Aware** - Handles both JSON and HTML responses
+✅ **Flexible Config** - Environment variables or interactive prompts
+✅ **Debugging Support** - Disable headless mode to watch browser
 
 ## Project Structure
 

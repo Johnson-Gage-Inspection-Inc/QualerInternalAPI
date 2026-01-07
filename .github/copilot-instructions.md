@@ -11,7 +11,7 @@ QualerInternalAPI is a Python-based data extraction pipeline for the Qualer qual
 - Automatically extracts authenticated cookies into a `requests.Session`
 - Provides both DB access (SQLAlchemy) and HTTP access (requests)
 - **Always use as context manager**: `with QualerAPIFetcher() as fetcher: ...`
-- Credentials: `QUALER_USERNAME`/`QUALER_PASSWORD`/`DB_URL` env vars or interactive prompt
+- Credentials: `QUALER_EMAIL`/`QUALER_PASSWORD`/`DB_URL` env vars or interactive prompt
 - Cleans up Selenium driver automatically on exit
 
 ### Data Extraction Pattern
@@ -33,18 +33,17 @@ Example: `getClientInformation.py` - fetches all client HTML forms, parses with 
 
 ### Running Scripts
 ```bash
+# Activate virtual environment (Once per terminal session)
+.venv\Scripts\Activate.ps1
+
 # First-time setup: install editable package
 pip install -e .
 pip install -r requirements.txt
-
-# Activate virtual environment
-.venv\Scripts\Activate.ps1
-
 # Run extraction script from any directory (imports work cleanly)
 python scripts/getClientInformation.py
 
 # With environment variables pre-set
-$env:QUALER_USERNAME="user@jgiquality.com"; python scripts/getClientInformation.py
+$env:QUALER_EMAIL="user@jgiquality.com"; python scripts/getClientInformation.py
 ```
 
 ### Testing
@@ -85,7 +84,7 @@ $env:QUALER_USERNAME="user@jgiquality.com"; python scripts/getClientInformation.
 
 ### Environment Variables
 - `.env` file auto-loaded by `dotenv` in `utils/auth.py` and `parse.py`
-- Key vars: `QUALER_USERNAME`, `QUALER_PASSWORD`, `QUALER_API_KEY`, `DB_URL`
+- Key vars: `QUALER_EMAIL`, `QUALER_PASSWORD`, `QUALER_API_KEY`, `DB_URL`
 - Database: Use `DB_URL` environment variable (e.g., `postgresql://postgres:postgres@192.168.1.177:5432/qualer`)
 
 ### Key Libraries
