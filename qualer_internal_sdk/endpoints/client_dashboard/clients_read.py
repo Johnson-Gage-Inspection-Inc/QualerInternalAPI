@@ -22,7 +22,8 @@ def clients_read(page_size: int = 1000000) -> dict:
         print("Navigating to clients page...")
         if not api.driver:
             raise RuntimeError("Failed to initialize Selenium driver")
-        api.driver.get("https://jgiquality.qualer.com/clients")
+        clients_page_url = "https://jgiquality.qualer.com/clients"
+        api.driver.get(clients_page_url)
 
         # Give page time to load and render
         sleep(3)
@@ -56,7 +57,7 @@ def clients_read(page_size: int = 1000000) -> dict:
             "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
             "origin": "https://jgiquality.qualer.com",
             "pragma": "no-cache",
-            "referer": "https://jgiquality.qualer.com/clients",
+            "referer": clients_page_url,
             "x-requested-with": "XMLHttpRequest",
         }
 
