@@ -14,7 +14,7 @@ class ClientCountsView(TypedDict):
     """Client counts grouped by filter type."""
 
     AllClients: int
-    Prospect: int
+    Prospects: int  # Matches FilterType.Prospects (plural)
     Delinquent: int
     Inactive: int
     Unapproved: int

@@ -92,9 +92,9 @@ class QualerAPIFetcher:
         # Authentication setup
         self.username = username or os.getenv("QUALER_EMAIL")
         self.password = password or os.getenv("QUALER_PASSWORD")
-        self.driver: webdriver.Chrome
+        self.driver: Optional[webdriver.Chrome] = None
         self.headless = headless
-        self.session: requests.Session
+        self.session: Optional[requests.Session] = None
         self.login_wait_time = float(os.getenv("QUALER_LOGIN_WAIT_TIME", login_wait_time))
 
     def __enter__(self):
@@ -472,9 +472,13 @@ class QualerAPIFetcher:
         and executed via execute_async_script(). The browser's authentication
         context is what makes these requests succeed (pure HTTP requests fail).
 
+        Security Note: url and body are URL-encoded by the caller (urlencode)
+        before being passed here, so special characters are already escaped.
+        The JavaScript string interpolation is safe because values are pre-encoded.
+
         Args:
             method: HTTP method ("GET" or "POST")
-            url: Full URL including query string for GET
+            url: Full URL including query string for GET (already URL-encoded)
             body: URL-encoded form data string for POST (None for GET)
 
         Returns:

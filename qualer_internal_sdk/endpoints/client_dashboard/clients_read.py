@@ -20,6 +20,12 @@ def clients_read(
 
     Endpoint: POST /ClientDashboard/Clients_Read
 
+    ⚠️ Breaking Changes from Previous Version:
+        - sort → split into sort_by (SortField enum) and sort_order (SortOrder enum)
+        - filter → renamed to filter_str (to avoid Python keyword conflict)
+        - filter_type → now uses FilterType enum instead of string
+        - Return type → now ClientsReadResponse (TypedDict) instead of generic dict
+
     Args:
         sort_by: Field to sort by (default: SortField.ClientCompanyName)
             Options: ClientCompanyName, ClientAccountNumber, ContactName,
