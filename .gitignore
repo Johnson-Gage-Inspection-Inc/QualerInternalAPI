@@ -6,3 +6,4 @@ qualer_internal_api.egg-info
 local/
 *.csv
 *.json
+temp.*
