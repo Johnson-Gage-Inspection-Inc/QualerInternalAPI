@@ -9,9 +9,9 @@ DATADUMP_SCHEMA = """
         url TEXT NOT NULL,
         service TEXT NOT NULL,
         method TEXT NOT NULL,
-        request_header JSONB,
+        request_header hstore,
         response_body TEXT,
-        response_header JSONB,
+        response_header hstore,
         parsed BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(url, service, method)

@@ -267,7 +267,7 @@ class ORMStorage(StorageAdapter):
         """Store API response using ORM model.
 
         Automatically handles duplicate detection via unique constraint.
-        Serializes dict headers to JSON strings before storage.
+        Stores dict headers directly as JSONB (no extra serialization).
 
         Args:
             url: API endpoint URL
@@ -283,32 +283,17 @@ class ORMStorage(StorageAdapter):
         """
         from .models import APIResponse
 
-        # Serialize headers to JSON strings for storage
-        req_headers_json = (
-            json.dumps(request_headers) if isinstance(request_headers, dict) else request_headers
-        )
-        res_headers_json = (
-            json.dumps(response_headers) if isinstance(response_headers, dict) else response_headers
-        )
-
         session = self.Session()
         try:
             # Create ORM model instance
+            # Note: JSONB columns accept dicts directly; SQLAlchemy handles serialization
             response = APIResponse(
                 url=url,
                 service=service,
                 method=method,
-                request_header=(
-                    json.loads(req_headers_json)
-                    if isinstance(req_headers_json, str)
-                    else req_headers_json
-                ),
+                request_header=request_headers,  # Pass dict directly, JSONB handles it
                 response_body=response_body,
-                response_header=(
-                    json.loads(res_headers_json)
-                    if isinstance(res_headers_json, str)
-                    else res_headers_json
-                ),
+                response_header=response_headers,  # Pass dict directly, JSONB handles it
                 parsed=False,
             )
 
