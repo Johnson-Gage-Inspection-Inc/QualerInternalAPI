@@ -51,7 +51,8 @@ class PostgresRawStorage(StorageAdapter):
         Args:
             db_url: PostgreSQL connection string (e.g., postgresql://user:pass@host/db)
         """
-        self.engine: Optional[Engine] = create_engine(db_url)
+        self.engine: Engine = create_engine(db_url)
+        self._disposed = False
 
     def store_response(
         self,
@@ -63,8 +64,8 @@ class PostgresRawStorage(StorageAdapter):
         response_headers: Dict[str, Any],
     ) -> None:
         """Store response in datadump table with conflict handling."""
-        if not self.engine:
-            raise RuntimeError("Storage engine not initialized")
+        if self._disposed:
+            raise RuntimeError("Storage engine has been disposed")
 
         with self.engine.begin() as conn:
             conn.execute(
@@ -76,7 +77,7 @@ class PostgresRawStorage(StorageAdapter):
                     )
                     VALUES (
                         :url, :service, :method,
-                        :req_headers, :res_body, :res_headers
+                        CAST(:req_headers AS jsonb), :res_body, CAST(:res_headers AS jsonb)
                     )
                     ON CONFLICT (url, service, method) DO NOTHING
                     """
@@ -85,25 +86,25 @@ class PostgresRawStorage(StorageAdapter):
                     "url": url,
                     "service": service,
                     "method": method,
-                    "req_headers": request_headers,
+                    "req_headers": json.dumps(request_headers),
                     "res_body": response_body,
-                    "res_headers": response_headers,
+                    "res_headers": json.dumps(response_headers),
                 },
             )
 
     def run_sql(self, sql_query: str, params: Optional[Dict] = None):
         """Execute arbitrary SQL query (for backwards compatibility)."""
-        if not self.engine:
-            raise RuntimeError("Storage engine not initialized")
+        if self._disposed:
+            raise RuntimeError("Storage engine has been disposed")
         with self.engine.connect() as conn:
             result = conn.execute(text(sql_query), params or {})
             return result.fetchall()
 
     def close(self) -> None:
         """Dispose of SQLAlchemy engine."""
-        if self.engine:
+        if not self._disposed:
             self.engine.dispose()
-            self.engine = None
+            self._disposed = True
 
 
 class CSVStorage(StorageAdapter):
@@ -111,9 +112,11 @@ class CSVStorage(StorageAdapter):
     Stores API responses as CSV files (for ad-hoc analysis).
 
     Creates one CSV file per service with columns:
-        timestamp, url, method, status_code, response_body
+        timestamp, url, method, response_body, request_headers, response_headers
 
     Useful for quick data exploration without database overhead.
+    Note: This implementation is not thread-safe. Use separate instances
+    for concurrent access or implement file locking if needed.
     """
 
     def __init__(self, output_dir: str = "data/responses"):
@@ -142,7 +145,8 @@ class CSVStorage(StorageAdapter):
         file_exists = os.path.exists(csv_path)
 
         with open(csv_path, "a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
+            # Use QUOTE_ALL to prevent CSV injection attacks
+            writer = csv.writer(f, quoting=csv.QUOTE_ALL)
 
             # Write header if new file
             if not file_exists:
