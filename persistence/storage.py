@@ -282,7 +282,6 @@ class ORMStorage(StorageAdapter):
         except IntegrityError:
             session.rollback()
             # Duplicate key violation - expected for idempotent operations
-            pass
         finally:
             session.close()
 
