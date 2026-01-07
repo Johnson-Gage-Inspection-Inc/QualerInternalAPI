@@ -3,6 +3,21 @@
 from time import sleep
 
 from utils.auth import QualerAPIFetcher
+from enum import Enum
+
+
+class FilterType(str, Enum):
+    """Enumeration of filter types for Clients_Read endpoint."""
+
+    AllClients = "AllClients"
+    Prospects = "Prospects"
+    Delinquent = "Delinquent"
+    Inactive = "Inactive"
+    Unapproved = "Unapproved"
+    Hidden = "Hidden"
+    # Managed assets:
+    AssetsDue = "AssetsDue"
+    AssetsPastDue = "AssetsPastDue"
 
 
 def clients_read(
@@ -10,9 +25,9 @@ def clients_read(
     page: int = 1,
     page_size: int = 1000000,
     group: str = "",
-    filter: str = "",
+    filter_str: str = "",
     search: str = "",
-    filter_type: str = "AllClients",
+    filter_type: FilterType = FilterType.AllClients,
 ) -> dict:
     """
     Fetch all clients from Qualer ClientDashboard API.
@@ -20,10 +35,22 @@ def clients_read(
     Endpoint: POST /ClientDashboard/Clients_Read
 
     Args:
-        page_size: Number of results to fetch per page (default: 1000000)
+        sort: Sort order (e.g., "ClientCompanyName-asc", "ClientCompanyName-desc")
+        page: Page number for pagination (default: 1)
+        page_size: Number of results per page (default: 1000000)
+        group: Group filter value (default: empty string)
+        filter_str: Additional filter criteria (default: empty string)
+        search: Search query string (default: empty string)
+        filter_type: Type of filter to apply (default: FilterType.AllClients)
+            Options: AllClients, Prospects, Delinquent, Inactive, Unapproved,
+            Hidden, AssetsDue, AssetsPastDue
 
     Returns:
         Dictionary containing the API response with client data
+
+    Raises:
+        RuntimeError: If Selenium driver initialization fails
+        Exception: If API request fails
     """
     with QualerAPIFetcher() as api:
         # Navigate to clients page first to establish proper browser context and cookies
@@ -50,7 +77,7 @@ def clients_read(
             "page": page,
             "pageSize": page_size,
             "group": group,
-            "filter": filter,
+            "filter": filter_str,
             "search": search,
             "filterType": filter_type,
             "__RequestVerificationToken": csrf_token,  # CRITICAL: Include CSRF token
