@@ -44,7 +44,7 @@ class QualerAPIFetcher:
             storage: (Optional) Custom storage adapter (PostgresRawStorage, CSVStorage, etc.)
                      Overrides db_url if both provided.
             headless: Run Selenium in headless mode (default: True)
-            username: Qualer username (reads from QUALER_USERNAME env var if not provided)
+            username: Qualer username (reads from QUALER_EMAIL env var if not provided)
             password: Qualer password (reads from QUALER_PASSWORD env var if not provided)
             login_wait_time: Seconds to wait after login for page to load
                             (configurable via QUALER_LOGIN_WAIT_TIME env var)
@@ -74,7 +74,7 @@ class QualerAPIFetcher:
             self.storage: Optional[StorageAdapter] = PostgresRawStorage(db_url) if db_url else None
 
         # Authentication setup
-        self.username = username or os.getenv("QUALER_USERNAME")
+        self.username = username or os.getenv("QUALER_EMAIL")
         self.password = password or os.getenv("QUALER_PASSWORD")
         self.driver = None
         self.headless = headless

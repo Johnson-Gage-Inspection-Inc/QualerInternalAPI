@@ -13,11 +13,11 @@ from qualer_internal_sdk.schemas import UncertaintyParametersResponse
 def qualer_api():
     """Fixture for tests requiring actual Qualer authentication (skipped in CI)."""
     # Skip if no credentials available (CI environment)
-    username = os.getenv("QUALER_USERNAME")
+    username = os.getenv("QUALER_EMAIL")
     password = os.getenv("QUALER_PASSWORD")
 
     if not username or not password:
-        pytest.skip("Qualer credentials not available (set QUALER_USERNAME and QUALER_PASSWORD)")
+        pytest.skip("Qualer credentials not available (set QUALER_EMAIL and QUALER_PASSWORD)")
 
     with QualerAPIFetcher(username=username, password=password) as api:
         yield api
