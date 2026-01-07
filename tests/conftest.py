@@ -22,30 +22,14 @@ def postgres_container():
         connection_url = postgres.get_connection_url()
 
         # Create tables needed for tests
-        from sqlalchemy import create_engine, text
+        from sqlalchemy import create_engine
+        from persistence.schema import create_datadump_table
 
         engine = create_engine(connection_url)
 
         with engine.begin() as conn:
             # Create datadump table (used by PostgresRawStorage)
-            conn.execute(
-                text(
-                    """
-                CREATE TABLE IF NOT EXISTS datadump (
-                    id SERIAL PRIMARY KEY,
-                    url TEXT NOT NULL,
-                    service TEXT NOT NULL,
-                    method TEXT NOT NULL,
-                    request_header JSONB,
-                    response_body TEXT,
-                    response_header JSONB,
-                    parsed BOOLEAN DEFAULT FALSE,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(url, service, method)
-                )
-            """
-                )
-            )
+            create_datadump_table(conn)
 
         engine.dispose()
 

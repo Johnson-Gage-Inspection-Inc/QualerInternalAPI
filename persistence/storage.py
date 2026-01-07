@@ -51,7 +51,7 @@ class PostgresRawStorage(StorageAdapter):
         Args:
             db_url: PostgreSQL connection string (e.g., postgresql://user:pass@host/db)
         """
-        self.engine: Optional[Engine] = create_engine(db_url)
+        self.engine: Engine = create_engine(db_url)
 
     def store_response(
         self,
@@ -106,9 +106,7 @@ class PostgresRawStorage(StorageAdapter):
 
     def close(self) -> None:
         """Dispose of SQLAlchemy engine."""
-        if self.engine:
-            self.engine.dispose()
-            self.engine = None
+        self.engine.dispose()
 
 
 class CSVStorage(StorageAdapter):
@@ -116,9 +114,13 @@ class CSVStorage(StorageAdapter):
     Stores API responses as CSV files (for ad-hoc analysis).
 
     Creates one CSV file per service with columns:
-        timestamp, url, method, status_code, response_body
+        timestamp, url, method, response_body, request_headers, response_headers
 
     Useful for quick data exploration without database overhead.
+
+    Note: Not thread-safe. Multiple processes/threads writing to the same CSV file
+    may cause duplicate headers or corrupted data. Use PostgresRawStorage for
+    concurrent access or implement file locking if concurrent access is required.
     """
 
     def __init__(self, output_dir: str = "data/responses"):
@@ -147,7 +149,7 @@ class CSVStorage(StorageAdapter):
         file_exists = os.path.exists(csv_path)
 
         with open(csv_path, "a", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
+            writer = csv.writer(f, quoting=csv.QUOTE_ALL)
 
             # Write header if new file
             if not file_exists:
