@@ -9,10 +9,22 @@ QualerInternalAPI is a Python-based data extraction pipeline for the Qualer qual
 **Pattern**: `QualerAPIFetcher` (context manager in `utils/auth.py`)
 - Handles browser automation via Selenium for Qualer login
 - Automatically extracts authenticated cookies into a `requests.Session`
-- Provides both DB access (SQLAlchemy) and HTTP access (requests)
+- Provides both DB access (SQLAlchemy) and HTTP/browser-based API access
 - **Always use as context manager**: `with QualerAPIFetcher() as fetcher: ...`
 - Credentials: `QUALER_EMAIL`/`QUALER_PASSWORD`/`DB_URL` env vars or interactive prompt
 - Cleans up Selenium driver automatically on exit
+
+**Two API Access Patterns** (see `docs/ENDPOINT_AUTHENTICATION_PATTERNS.md`):
+1. **HTTP-Based** (`api.get()`, `api.post()`, `api.fetch()`):
+   - Standard REST API requests using `requests.Session`
+   - Fast and efficient
+   - Works for: Client Information, Uncertainty endpoints, Service Groups
+   
+2. **Browser-Based** (`api.fetch_via_browser()`):
+   - JavaScript fetch() executed inside authenticated browser
+   - Required when HTTP returns 401 despite valid cookies
+   - Slower but bypasses JavaScript-based authentication validation
+   - Works for: ClientDashboard endpoints (Clients_Read, ClientsCountView)
 
 ### Data Extraction Pattern
 1. **Fetch HTML** - Use authenticated session to GET endpoint

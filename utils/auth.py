@@ -24,6 +24,21 @@ class QualerAPIFetcher:
 
     Uses Selenium for browser automation to handle login, then provides an
     authenticated requests.Session for API calls.
+
+    Authentication Patterns:
+    -----------------------
+
+    🌐 HTTP-Based Methods (use when possible):
+        - get()  → Standard HTTP GET with requests.Session
+        - post() → Standard HTTP POST with requests.Session
+        - fetch() → HTTP GET with <pre> tag extraction
+        ✅ Use for: Standard REST APIs that accept HTTP requests
+        ❌ Fails with: 401 errors on some Qualer internal endpoints
+
+    🖥️ Browser-Based Methods (use when HTTP fails):
+        - fetch_via_browser() → JavaScript fetch() executed in browser
+        ✅ Use for: Qualer internal APIs that validate browser context
+        ⚠️ Slower but bypasses authentication validation issues
     """
 
     def __init__(
@@ -77,9 +92,9 @@ class QualerAPIFetcher:
         # Authentication setup
         self.username = username or os.getenv("QUALER_EMAIL")
         self.password = password or os.getenv("QUALER_PASSWORD")
-        self.driver = None
+        self.driver: Optional[webdriver.Chrome] = None
         self.headless = headless
-        self.session = None
+        self.session: Optional[requests.Session] = None
         self.login_wait_time = float(os.getenv("QUALER_LOGIN_WAIT_TIME", login_wait_time))
 
     def __enter__(self):
@@ -303,6 +318,7 @@ class QualerAPIFetcher:
         url: str,
         data: Optional[dict] = None,
         referer: Optional[str] = None,
+        include_csrf: bool = True,
         **kwargs,
     ) -> requests.Response:
         """
@@ -311,10 +327,14 @@ class QualerAPIFetcher:
         Automatically includes common headers (accept, cache-control, etc.) plus
         x-requested-with and content-type headers appropriate for form data submission.
 
+        Optionally auto-injects CSRF token if needed (default: True).
+
         Args:
             url: Endpoint URL
             data: (Optional) Form data dictionary to POST
             referer: (Optional) Referer URL for the request
+            include_csrf: (Optional) Automatically extract and inject CSRF token if missing
+                         from data dict and driver has loaded page (default: True)
             **kwargs: Additional arguments passed to session.post() (timeout, etc.)
 
         Returns:
@@ -325,6 +345,7 @@ class QualerAPIFetcher:
             requests.HTTPError: If response status indicates error
 
         Example:
+            >>> # CSRF token automatically added if needed
             >>> response = api.post(
             ...     "https://jgiquality.qualer.com/ClientDashboard/Clients_Read",
             ...     data={"sort": "Name-asc", "page": 1, ...},
@@ -335,6 +356,19 @@ class QualerAPIFetcher:
         """
         if not self.session:
             raise RuntimeError("No valid session. Did login succeed?")
+
+        # Auto-inject CSRF token if requested and not already in data
+        if data is None:
+            data = {}
+
+        if include_csrf and "__RequestVerificationToken" not in data:
+            if self.driver and self.driver.current_url:
+                try:
+                    csrf_token = self.extract_csrf_token(self.driver.page_source)
+                    data["__RequestVerificationToken"] = csrf_token
+                except ValueError:
+                    # Token not found - endpoint might not require it
+                    pass
 
         # Get standard headers with POST-specific additions
         headers = self.get_headers(
@@ -429,3 +463,153 @@ class QualerAPIFetcher:
             print(f"HTML snippet:\n{html[:2000]}\n")
 
         raise ValueError("Could not find CSRF token in page")
+
+    def _generate_browser_fetch_js(self, method: str, url: str, body: Optional[str] = None) -> str:
+        """
+        Generate JavaScript fetch code to execute in browser context.
+
+        This JavaScript code is injected into the authenticated browser session
+        and executed via execute_async_script(). The browser's authentication
+        context is what makes these requests succeed (pure HTTP requests fail).
+
+        Security Note: url and body are URL-encoded by the caller (urlencode)
+        before being passed here, so special characters are already escaped.
+        The JavaScript string interpolation is safe because values are pre-encoded.
+
+        Args:
+            method: HTTP method ("GET" or "POST")
+            url: Full URL including query string for GET (already URL-encoded)
+            body: URL-encoded form data string for POST (None for GET)
+
+        Returns:
+            JavaScript code string ready for execute_async_script()
+        """
+        if method.upper() == "GET":
+            return f"""
+            var callback = arguments[arguments.length - 1];
+            fetch('{url}', {{
+                method: 'GET',
+                headers: {{
+                    'x-requested-with': 'XMLHttpRequest'
+                }},
+                credentials: 'include'
+            }})
+            .then(response => response.json())
+            .then(data => callback(data))
+            .catch(error => callback({{error: error.toString()}}));
+            """
+        else:  # POST
+            return f"""
+            var callback = arguments[arguments.length - 1];
+            fetch('{url}', {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'x-requested-with': 'XMLHttpRequest'
+                }},
+                body: '{body}',
+                credentials: 'include'
+            }})
+            .then(response => {{
+                if (!response.ok) {{
+                    return callback({{error: 'HTTP ' + response.status + ': ' + response.statusText}});
+                }}
+                return response.json();
+            }})
+            .then(data => {{
+                if (data && !data.error) {{
+                    callback(data);
+                }}
+            }})
+            .catch(error => callback({{error: error.toString()}}));
+            """
+
+    def fetch_via_browser(
+        self,
+        method: str,
+        endpoint_path: str,
+        auth_context_page: str,
+        params: dict,
+        include_csrf: Optional[bool] = None,
+    ) -> dict:
+        """
+        Fetch API endpoint by executing JavaScript fetch() inside authenticated browser.
+
+        ⚠️ BROWSER-BASED APPROACH - Use this instead of get()/post() for endpoints that:
+        - Return 401 errors with pure HTTP requests (even with valid cookies/CSRF)
+        - Require JavaScript execution context for authentication validation
+        - Are part of Qualer's internal/undocumented API
+
+        This method:
+        1. Navigates to a page to establish auth context
+        2. Generates JavaScript fetch() code
+        3. Injects and executes it in the browser via Selenium
+        4. Returns the parsed JSON response
+
+        For standard REST APIs that accept HTTP requests, use get() or post() instead.
+
+        Args:
+            method: HTTP method - "GET" or "POST"
+            endpoint_path: API endpoint path (e.g., "/ClientDashboard/ClientsCountView")
+            auth_context_page: Page to navigate to for auth context (e.g., "/clients")
+            params: Request parameters (query params for GET, form data for POST)
+            include_csrf: Whether to include CSRF token (default: True for POST, False for GET)
+
+        Returns:
+            Parsed JSON response from the endpoint
+
+        Raises:
+            RuntimeError: If driver not initialized or JavaScript execution fails
+
+        Example:
+            >>> # Endpoint that requires browser context
+            >>> response = api.fetch_via_browser(
+            ...     method="POST",
+            ...     endpoint_path="/ClientDashboard/Clients_Read",
+            ...     auth_context_page="/clients",
+            ...     params={"sort": "Name-asc", "page": 1},
+            ... )
+        """
+        if not self.driver:
+            raise RuntimeError("Driver not initialized")
+
+        # Get base URL from current session
+        base_url = "https://jgiquality.qualer.com"
+
+        # Navigate to auth context page
+        self.driver.get(f"{base_url}{auth_context_page}")
+        sleep(3)  # Wait longer for JavaScript and AJAX to complete
+
+        # Auto-determine CSRF inclusion if not specified
+        if include_csrf is None:
+            include_csrf = method.upper() == "POST"
+
+        # Add CSRF token for POST requests
+        if include_csrf and method.upper() == "POST":
+            try:
+                csrf_token = self.extract_csrf_token(self.driver.page_source)
+                params["__RequestVerificationToken"] = csrf_token
+            except ValueError:
+                # Token not found - some endpoints may not require it
+                # or it may be injected differently. Proceed without it.
+                print("WARNING: No CSRF token found, proceeding without it...")
+
+        # Build URL and generate JavaScript fetch code
+        from urllib.parse import urlencode
+
+        if method.upper() == "GET":
+            query_string = urlencode(params)
+            url = f"{base_url}{endpoint_path}?{query_string}"
+            js_code = self._generate_browser_fetch_js("GET", url)
+        else:  # POST
+            url = f"{base_url}{endpoint_path}"
+            payload = urlencode(params)
+            js_code = self._generate_browser_fetch_js("POST", url, payload)
+
+        # Execute JavaScript in browser and get result
+        result = self.driver.execute_async_script(js_code)
+
+        if isinstance(result, dict) and "error" in result:
+            raise RuntimeError(f"JavaScript fetch failed: {result['error']}")
+
+        return result
