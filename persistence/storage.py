@@ -38,7 +38,7 @@ class PostgresRawStorage(StorageAdapter):
     This is the "raw staging" layer - responses are stored as-is for later parsing.
     Schema:
         - url, service, method (composite key)
-        - request_header, response_header (hstore - converted from JSON)
+        - request_header, response_header (JSONB for efficient querying)
         - response_body (TEXT)
         - parsed (BOOLEAN) - flag for downstream processing
     """
@@ -52,24 +52,6 @@ class PostgresRawStorage(StorageAdapter):
         """
         self.engine = create_engine(db_url)
 
-    def _json_to_hstore(self, json_dict: Dict[str, Any]) -> str:
-        """
-        Convert a dictionary to PostgreSQL hstore format.
-
-        hstore format: "key1"=>"value1", "key2"=>"value2"
-        """
-        if not isinstance(json_dict, dict):
-            return "{}"
-
-        pairs = []
-        for key, value in json_dict.items():
-            # Escape quotes in key and value
-            safe_key = str(key).replace('"', '\\"')
-            safe_value = str(value).replace('"', '\\"')
-            pairs.append(f'"{safe_key}"=>"{safe_value}"')
-
-        return ", ".join(pairs) if pairs else ""
-
     def store_response(
         self,
         url: str,
@@ -79,13 +61,9 @@ class PostgresRawStorage(StorageAdapter):
         response_body: str,
         response_headers: Dict[str, Any],
     ) -> None:
-        """Store response in datadump table with conflict handling."""
+        """Store response in datadump table with JSONB for headers."""
         if not self.engine:
             raise RuntimeError("Storage engine not initialized")
-
-        # Convert headers: both request_header and response_header are hstore in the DB
-        req_headers_hstore = self._json_to_hstore(request_headers)
-        res_headers_hstore = self._json_to_hstore(response_headers)
 
         try:
             with self.engine.begin() as conn:
@@ -98,7 +76,7 @@ class PostgresRawStorage(StorageAdapter):
                         )
                         VALUES (
                             :url, :service, :method,
-                            CAST(:req_headers AS hstore), :res_body, CAST(:res_headers AS hstore)
+                            CAST(:req_headers AS jsonb), :res_body, CAST(:res_headers AS jsonb)
                         )
                         """
                     ),
@@ -106,9 +84,9 @@ class PostgresRawStorage(StorageAdapter):
                         "url": url,
                         "service": service,
                         "method": method,
-                        "req_headers": req_headers_hstore,
+                        "req_headers": json.dumps(request_headers) if request_headers else None,
                         "res_body": response_body,
-                        "res_headers": res_headers_hstore,
+                        "res_headers": json.dumps(response_headers) if response_headers else None,
                     },
                 )
         except Exception:

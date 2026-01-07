@@ -3,7 +3,6 @@
 import os
 import tempfile
 from persistence.storage import PostgresRawStorage, CSVStorage
-from persistence.schema import create_datadump_table
 
 
 class TestPostgresRawStorage:
@@ -12,7 +11,6 @@ class TestPostgresRawStorage:
     def test_store_response_success(self, db_url):
         """Test storing a response successfully."""
         storage = PostgresRawStorage(db_url)
-        create_datadump_table(storage.engine.connect())
 
         test_data = {
             "url": "https://example.com/api",
@@ -40,7 +38,6 @@ class TestPostgresRawStorage:
     def test_store_response_conflict_handling(self, db_url):
         """Test that duplicate inserts are handled gracefully with ON CONFLICT."""
         storage = PostgresRawStorage(db_url)
-        create_datadump_table(storage.engine.connect())
 
         test_data = {
             "url": "https://example.com/api",
@@ -68,7 +65,6 @@ class TestPostgresRawStorage:
     def test_run_sql_select(self, db_url):
         """Test running SELECT queries."""
         storage = PostgresRawStorage(db_url)
-        create_datadump_table(storage.engine.connect())
 
         # Insert test data
         storage.run_sql(
@@ -98,7 +94,6 @@ class TestPostgresRawStorage:
     def test_run_sql_insert_returns_none(self, db_url):
         """Test that INSERT queries return None (no rows)."""
         storage = PostgresRawStorage(db_url)
-        create_datadump_table(storage.engine.connect())
 
         result = storage.run_sql(
             """
