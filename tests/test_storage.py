@@ -3,8 +3,10 @@
 import os
 import tempfile
 from persistence.storage import PostgresRawStorage, CSVStorage
+import pytest
 
 
+@pytest.mark.database
 class TestPostgresRawStorage:
     """Tests for PostgresRawStorage adapter."""
 
@@ -244,6 +246,7 @@ class TestCSVStorage:
                 assert "response_headers" in header
 
 
+@pytest.mark.database
 class TestORMStorage:
     """Tests for ORMStorage adapter with SQLAlchemy ORM models."""
 

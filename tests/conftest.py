@@ -69,13 +69,13 @@ def postgres_container(_postgres_container_session):
 
     # Run Alembic migrations to create fresh schema
     import pathlib
-    
+
     project_root = pathlib.Path(__file__).parent.parent
     alembic_ini_path = project_root / "alembic.ini"
-    
+
     alembic_cfg = Config(str(alembic_ini_path))
     alembic_cfg.set_main_option("sqlalchemy.url", connection_url)
-    
+
     # Stamp the database as being at "base" (no migrations) so upgrade works
     command.stamp(alembic_cfg, "base")
     # Now run all migrations
@@ -88,3 +88,10 @@ def postgres_container(_postgres_container_session):
 def db_url(postgres_container):
     """Provide database URL from testcontainer."""
     return postgres_container
+
+
+def pytest_collection_modifyitems(config, items):
+    """Auto-apply postgres_container fixture to tests marked with @pytest.mark.database."""
+    for item in items:
+        if item.get_closest_marker("database"):
+            item.fixturenames.append("postgres_container")

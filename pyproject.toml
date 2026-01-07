@@ -39,3 +39,8 @@ ignore = ["E501"]  # Line too long
 
 [tool.mypy]
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+markers = [
+    "database: marks tests as requiring PostgreSQL database (deselect with '-m \"not database\"')",
+]
