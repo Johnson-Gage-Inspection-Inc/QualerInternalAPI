@@ -129,7 +129,12 @@ class QualerAPIFetcher:
 
         # First, get response headers from requests to check Content-Type
         r = self.session.get(url)
-        r.raise_for_status()  # Raise exception for HTTP errors
+        # Handle HTTP errors early to avoid inserting error pages into the database.
+        # Skip 403s gracefully in bulk operations, per project conventions.
+        if r.status_code == 403:
+            print(f"Warning: 403 Forbidden when accessing {url}. Skipping.")
+            return
+        r.raise_for_status()
         content_type = r.headers.get("Content-Type", "").lower()
 
         # Use Selenium to get the actual response body (handles JavaScript-rendered content)
@@ -139,8 +144,7 @@ class QualerAPIFetcher:
         # If JSON response, try to extract from <pre> tag; otherwise store raw HTML
         if content_type.startswith("application/json") or "json" in content_type:
             soup = BeautifulSoup(response_body, "html.parser")
-            pre = soup.find("pre")
-            if pre:
+            if pre := soup.find("pre"):  # HACK: What's the significance of <pre> here?
                 response_body = pre.text.strip()
 
         # Store response to database
@@ -241,21 +245,15 @@ class QualerAPIFetcher:
             ValueError: If token cannot be found in HTML
         """
         # Look for __RequestVerificationToken in hidden input
-        # Pattern supports both single and double-quoted attributes
-        match = re.search(
-            r'name=(["\'])__RequestVerificationToken\1[^>]*?value=(["\'])([^"\']*)\2',
-            html,
-        )
+        # Pattern allows for attributes like type="hidden" between name and value
+        match = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', html)
         if match:
-            return match.group(3)
+            return match.group(1)
 
         # Try alternate pattern (value before name)
-        match = re.search(
-            r'value=(["\'])([^"\']*)\1[^>]*?name=(["\'])__RequestVerificationToken\3',
-            html,
-        )
+        match = re.search(r'value="([^"]+)"[^>]*name="__RequestVerificationToken"', html)
         if match:
-            return match.group(2)
+            return match.group(1)
 
         # Debug: print a snippet of the HTML
         print("DEBUG: Could not find token. Checking page structure...")
