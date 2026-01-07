@@ -12,6 +12,7 @@ from sqlalchemy import create_engine, text
 from bs4 import BeautifulSoup
 import json
 from dotenv import load_dotenv
+import re
 
 load_dotenv()
 
@@ -123,8 +124,45 @@ class QualerAPIFetcher:
 
     def fetch_and_store(self, url, service, method="GET"):
         """Fetch URL and insert response into datadump table."""
-        response = self.fetch(url)
-        self.store(url, service, method, response)
+        if not self.driver or not self.session:
+            raise RuntimeError("Driver or session not initialized")
+
+        # First, get response headers from requests to check Content-Type
+        r = self.session.get(url)
+        r.raise_for_status()  # Raise exception for HTTP errors
+        content_type = r.headers.get("Content-Type", "").lower()
+
+        # Use Selenium to get the actual response body (handles JavaScript-rendered content)
+        self.driver.get(url)
+        response_body = self.driver.page_source
+
+        # If JSON response, try to extract from <pre> tag; otherwise store raw HTML
+        if content_type.startswith("application/json") or "json" in content_type:
+            soup = BeautifulSoup(response_body, "html.parser")
+            pre = soup.find("pre")
+            if pre:
+                response_body = pre.text.strip()
+
+        # Store response to database
+        assert self.engine is not None
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO datadump (url, service, method, request_header, response_body, response_header)
+                    VALUES (:url, :service, :method, :req_headers, :res_body, :res_headers)
+                    ON CONFLICT (url, service, method) DO NOTHING
+                    """
+                ),
+                {
+                    "url": url,
+                    "service": service,
+                    "method": method,
+                    "req_headers": dict(r.request.headers) if r.request else {},
+                    "res_body": response_body,
+                    "res_headers": dict(r.headers),
+                },
+            )
 
     def store(self, url, service, method, response):
         """Store request/response in database."""
@@ -186,3 +224,49 @@ class QualerAPIFetcher:
         new_response.headers = r.headers
         new_response.request = r.request
         return new_response
+
+    def extract_csrf_token(self, html: str) -> str:
+        """
+        Extract CSRF token from HTML page.
+
+        Searches for __RequestVerificationToken in hidden input fields.
+
+        Args:
+            html: HTML content to search
+
+        Returns:
+            The CSRF token value
+
+        Raises:
+            ValueError: If token cannot be found in HTML
+        """
+        # Look for __RequestVerificationToken in hidden input
+        # Pattern supports both single and double-quoted attributes
+        match = re.search(
+            r'name=(["\'])__RequestVerificationToken\1[^>]*?value=(["\'])([^"\']*)\2',
+            html,
+        )
+        if match:
+            return match.group(3)
+
+        # Try alternate pattern (value before name)
+        match = re.search(
+            r'value=(["\'])([^"\']*)\1[^>]*?name=(["\'])__RequestVerificationToken\3',
+            html,
+        )
+        if match:
+            return match.group(2)
+
+        # Debug: print a snippet of the HTML
+        print("DEBUG: Could not find token. Checking page structure...")
+        if "__RequestVerificationToken" in html:
+            # Find context around the token
+            idx = html.find("__RequestVerificationToken")
+            snippet = html[max(0, idx - 100) : idx + 200]
+            print(f"Found token reference at:\n{snippet}\n")
+        else:
+            print("Token name not found in HTML at all")
+            # Print first 2000 chars to see structure
+            print(f"HTML snippet:\n{html[:2000]}\n")
+
+        raise ValueError("Could not find CSRF token in page")
