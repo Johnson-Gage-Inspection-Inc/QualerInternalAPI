@@ -34,7 +34,7 @@ def mock_driver():
 class TestClientsReadHTTPFirst:
     """Test cases for clients_read HTTP-first authentication pattern."""
 
-    @patch("qualer_internal_sdk.endpoints.client_dashboard.clients_read.QualerAPIFetcher")
+    @patch("utils.auth.QualerAPIFetcher")
     def test_http_post_success(self, mock_fetcher_class, mock_qualer_api_fetcher, mock_driver):
         """Test successful HTTP POST without fallback."""
         # Setup
@@ -70,7 +70,7 @@ class TestClientsReadHTTPFirst:
         mock_qualer_api_fetcher.session.post.assert_called_once()
         mock_qualer_api_fetcher.fetch_via_browser.assert_not_called()
 
-    @patch("qualer_internal_sdk.endpoints.client_dashboard.clients_read.QualerAPIFetcher")
+    @patch("utils.auth.QualerAPIFetcher")
     def test_http_post_fallback_on_error(
         self, mock_fetcher_class, mock_qualer_api_fetcher, mock_driver
     ):
@@ -99,7 +99,7 @@ class TestClientsReadHTTPFirst:
         assert result["Data"][0]["ClientCompanyName"] == "Fallback Company"
         mock_qualer_api_fetcher.fetch_via_browser.assert_called_once()
 
-    @patch("qualer_internal_sdk.endpoints.client_dashboard.clients_read.QualerAPIFetcher")
+    @patch("utils.auth.QualerAPIFetcher")
     def test_csrf_token_extraction_failure(
         self, mock_fetcher_class, mock_qualer_api_fetcher, mock_driver
     ):
@@ -125,7 +125,7 @@ class TestClientsReadHTTPFirst:
         mock_qualer_api_fetcher.fetch_via_browser.assert_called_once()
         mock_qualer_api_fetcher.session.post.assert_not_called()
 
-    @patch("qualer_internal_sdk.endpoints.client_dashboard.clients_read.QualerAPIFetcher")
+    @patch("utils.auth.QualerAPIFetcher")
     def test_http_post_non_200_status(
         self, mock_fetcher_class, mock_qualer_api_fetcher, mock_driver
     ):
@@ -154,7 +154,7 @@ class TestClientsReadHTTPFirst:
         assert result["Total"] == 0
         mock_qualer_api_fetcher.fetch_via_browser.assert_called_once()
 
-    @patch("qualer_internal_sdk.endpoints.client_dashboard.clients_read.QualerAPIFetcher")
+    @patch("utils.auth.QualerAPIFetcher")
     def test_request_headers_include_browser_fingerprint(
         self, mock_fetcher_class, mock_qualer_api_fetcher, mock_driver
     ):
@@ -185,7 +185,7 @@ class TestClientsReadHTTPFirst:
         call_args = mock_qualer_api_fetcher.session.post.call_args
         assert call_args.kwargs["headers"] == headers_with_fingerprint
 
-    @patch("qualer_internal_sdk.endpoints.client_dashboard.clients_read.QualerAPIFetcher")
+    @patch("utils.auth.QualerAPIFetcher")
     @patch.dict("os.environ", {"QUALER_PAGE_LOAD_WAIT_TIME": "5"})
     def test_configurable_page_load_wait(
         self, mock_fetcher_class, mock_qualer_api_fetcher, mock_driver
@@ -216,7 +216,7 @@ class TestClientsReadHTTPFirst:
 class TestCookieSyncErrors:
     """Test cases for cookie synchronization error handling."""
 
-    @patch("qualer_internal_sdk.endpoints.client_dashboard.clients_read.QualerAPIFetcher")
+    @patch("utils.auth.QualerAPIFetcher")
     def test_no_driver_error(self, mock_fetcher_class):
         """Test error handling when driver is not initialized."""
         # Setup
@@ -230,7 +230,7 @@ class TestCookieSyncErrors:
         with pytest.raises(RuntimeError, match="Failed to initialize Selenium driver"):
             clients_read()
 
-    @patch("qualer_internal_sdk.endpoints.client_dashboard.clients_read.QualerAPIFetcher")
+    @patch("utils.auth.QualerAPIFetcher")
     def test_no_session_error(self, mock_fetcher_class, mock_driver):
         """Test error handling when session is not initialized."""
         # Setup
