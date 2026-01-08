@@ -175,12 +175,16 @@ class QualerAPIFetcher:
         assert self.driver is not None
 
         for cookie in self.driver.get_cookies():
+            # Validate that critical cookie fields are present
+            if not cookie.get("name") or not cookie.get("value"):
+                continue
+
             # Preserve domain/path so the cookie is actually sent on requests
             # (requests.Session.set without domain/path can skip sending on some hosts).
             self.session.cookies.set_cookie(
                 create_cookie(
-                    name=cookie.get("name"),
-                    value=cookie.get("value"),
+                    name=cookie["name"],
+                    value=cookie["value"],
                     domain=cookie.get("domain"),
                     path=cookie.get("path", "/"),
                     secure=cookie.get("secure", False),
@@ -226,13 +230,13 @@ class QualerAPIFetcher:
             "pragma": "no-cache",
             "priority": "u=1, i",
             "referer": referer,
-            "sec-ch-ua": '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
+            "sec-ch-ua": '"Google Chrome";v="120", "Chromium";v="120", "Not A(Brand";v="24"',
             "sec-ch-ua-mobile": "?0",
             "sec-ch-ua-platform": '"Windows"',
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "same-origin",
-            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
 
         # Convert underscore keys to hyphenated headers
