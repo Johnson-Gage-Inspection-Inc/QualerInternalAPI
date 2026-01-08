@@ -1,15 +1,18 @@
 """Authentication utilities for Qualer API access."""
 
+import json
 import os
-from typing import Optional
-import requests
-from time import sleep
+from datetime import datetime, timezone
 from getpass import getpass
+from time import sleep
+from typing import Optional, Tuple
+
+import requests
+from requests.cookies import create_cookie
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from bs4 import BeautifulSoup
-import json
 from dotenv import load_dotenv
 
 from persistence.storage import StorageAdapter, PostgresRawStorage
@@ -154,7 +157,20 @@ class QualerAPIFetcher:
         self._sync_cookies_from_driver()
 
     def _sync_cookies_from_driver(self):
-        """Refresh requests.Session cookies from the current Selenium driver."""
+        """Refresh requests.Session cookies from the current Selenium driver.
+
+        Critical for preserving authentication cookies, especially ASP.NET anti-forgery
+        tokens with suffixed names (e.g., __RequestVerificationToken_L3...).
+
+        Note: This is a private method (_sync_cookies_from_driver) that is called
+        automatically during context manager initialization. Ensure domain/path/secure
+        attributes are preserved so cookies are sent on subsequent requests.
+
+        TODO: Add unit test coverage for this method to verify:
+        - Cookies transferred correctly from Selenium to requests.Session
+        - Domain/path/secure attributes preserved
+        - Works with suffixed cookie names
+        """
         assert self.session is not None
         assert self.driver is not None
 
@@ -162,7 +178,7 @@ class QualerAPIFetcher:
             # Preserve domain/path so the cookie is actually sent on requests
             # (requests.Session.set without domain/path can skip sending on some hosts).
             self.session.cookies.set_cookie(
-                requests.cookies.create_cookie(
+                create_cookie(
                     name=cookie.get("name"),
                     value=cookie.get("value"),
                     domain=cookie.get("domain"),
@@ -191,8 +207,6 @@ class QualerAPIFetcher:
             >>> headers = api.get_headers(referer="https://jgiquality.qualer.com/clients")
             >>> response = api.session.post(url, data=payload, headers=headers)
         """
-        from datetime import datetime, timezone
-
         # Default referer: use current driver URL or fall back to base
         if referer is None:
             if self.driver:
@@ -453,7 +467,7 @@ class QualerAPIFetcher:
         new_response.request = r.request
         return new_response
 
-    def extract_csrf_field(self, html: str) -> tuple[str, str]:
+    def extract_csrf_field(self, html: str) -> Tuple[str, str]:
         """Return (token_name, token_value) for the first CSRF input."""
         soup = BeautifulSoup(html, "html.parser")
         for input_tag in soup.find_all("input"):

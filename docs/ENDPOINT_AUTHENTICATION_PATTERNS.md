@@ -59,7 +59,7 @@ The following headers are **required** for POST requests to pass server-side val
     "accept-encoding": "gzip, deflate, br, zstd",
     "accept-language": "en-US,en;q=0.9",
     "cache-control": "no-cache, must-revalidate",
-    "clientrequesttime": "2026-01-08T19:35:16",  # UTC timestamp
+    "clientrequesttime": "YYYY-MM-DDTHH:MM:SS",  # UTC timestamp (current at request time)
     "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
     "origin": "https://jgiquality.qualer.com",
     "pragma": "no-cache",
@@ -140,12 +140,6 @@ Is this a POST request to ClientDashboard or similar internal API?
 ```
 
 **General Rule**: Always try HTTP-first with proper headers. The browser-based method is now a **debugging tool**, not a primary authentication pattern.
-
----
-        "pageSize": 100,
-    }
-)
-```
 
 ---
 

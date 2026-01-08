@@ -3,6 +3,8 @@
 from time import sleep
 from typing import cast
 
+import requests
+
 from utils.auth import QualerAPIFetcher
 from .types import FilterType, SortField, SortOrder
 from .response_types import ClientsReadResponse
@@ -55,11 +57,10 @@ def clients_read(
         api.driver.get("https://jgiquality.qualer.com/clients")
 
         # Give page time to load and render
-        sleep(3)
+        sleep(3)  # TODO: Make wait duration configurable via env var or parameter
 
-        # Sync any new cookies set by the page into the requests session
-        # This includes the suffixed cookie token (e.g., __RequestVerificationToken_L3...)
-        api._sync_cookies_from_driver()
+        # QualerAPIFetcher automatically syncs cookies from the browser to the session,
+        # including the suffixed CSRF token (e.g., __RequestVerificationToken_L3...).
 
         # Extract CSRF token from form field (standard name: __RequestVerificationToken)
         # ASP.NET uses double-submit cookie pattern: cookie token + form token
@@ -99,7 +100,7 @@ def clients_read(
                 return cast(ClientsReadResponse, response.json())
             else:
                 print(f"HTTP POST returned {response.status_code}, falling back to browser fetch")
-        except Exception as e:
+        except (requests.RequestException, ValueError, RuntimeError) as e:
             print(f"HTTP POST failed: {e}, falling back to browser fetch")
 
         # Fallback to browser-based fetch (known-good path)
