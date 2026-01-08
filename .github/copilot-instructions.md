@@ -14,17 +14,21 @@ QualerInternalAPI is a Python-based data extraction pipeline for the Qualer qual
 - Credentials: `QUALER_EMAIL`/`QUALER_PASSWORD`/`DB_URL` env vars or interactive prompt
 - Cleans up Selenium driver automatically on exit
 
-**Two API Access Patterns** (see `docs/ENDPOINT_AUTHENTICATION_PATTERNS.md`):
-1. **HTTP-Based** (`api.get()`, `api.post()`, `api.fetch()`):
-   - Standard REST API requests using `requests.Session`
-   - Fast and efficient
-   - Works for: Client Information, Uncertainty endpoints, Service Groups
-   
-2. **Browser-Based** (`api.fetch_via_browser()`):
-   - JavaScript fetch() executed inside authenticated browser
-   - Required when HTTP returns 401 despite valid cookies
-   - Slower but bypasses JavaScript-based authentication validation
-   - Works for: ClientDashboard endpoints (Clients_Read, ClientsCountView)
+**API Access Pattern** (see `docs/ENDPOINT_AUTHENTICATION_PATTERNS.md` and `docs/BREAKTHROUGH_HTTP_AUTHENTICATION.md`):
+- **HTTP-First** (`api.get()`, `api.post()`, `api.session.get/post()` with `api.get_headers()`):
+  - Standard REST API requests using `requests.Session`
+  - **Requires browser fingerprinting headers** (clientrequesttime, origin, sec-ch-ua family, user-agent)
+  - Fast and efficient (~10x faster than browser-based)
+  - Works for: ALL endpoints including ClientDashboard (Clients_Read, ClientsCountView), Client Information, Uncertainty endpoints, Service Groups
+  - **Always use this first** - `api.get_headers()` includes all required browser headers
+  
+- **Browser-Based Fallback** (`api.fetch_via_browser()`):
+  - JavaScript fetch() executed inside authenticated browser
+  - **Use only for debugging** when HTTP unexpectedly fails
+  - Slower but guaranteed to work (actual browser context)
+  - Useful for capturing HAR files to analyze missing headers
+
+**Key Discovery (Jan 2026)**: Qualer validates requests using browser fingerprinting beyond cookies/CSRF. The `get_headers()` method now includes all required headers (`clientrequesttime` timestamp, `origin`, `sec-ch-ua` family, full `user-agent`). Missing these → 401 Unauthorized.
 
 ### Data Extraction Pattern
 1. **Fetch HTML** - Use authenticated session to GET endpoint

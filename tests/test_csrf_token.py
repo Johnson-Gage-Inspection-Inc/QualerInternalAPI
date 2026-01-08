@@ -95,11 +95,28 @@ class TestExtractCSRFToken:
         html = """
         <input name='__RequestVerificationToken' value='single-quote-token'>
         """
-        # This test documents current behavior - regex expects double quotes
-        # If single quotes need to be supported, the regex would need updating
         fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        with pytest.raises(ValueError):
-            fetcher.extract_csrf_token(html)
+        token = fetcher.extract_csrf_token(html)
+        assert token == "single-quote-token"
+
+    def test_token_with_suffix_name(self):
+        """Support suffixed verification token names."""
+        html = """
+        <input type="hidden" name="__RequestVerificationToken_L3NoYXJlZC1zZWN1cmVk0" value="suffix-token-123">
+        """
+        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
+        token = fetcher.extract_csrf_token(html)
+        assert token == "suffix-token-123"
+
+    def test_extract_csrf_field_returns_name_and_value(self):
+        """Ensure extract_csrf_field returns both name and value."""
+        html = """
+        <input name="__RequestVerificationToken_custom" value="field-token-999">
+        """
+        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
+        name, token = fetcher.extract_csrf_field(html)
+        assert name == "__RequestVerificationToken_custom"
+        assert token == "field-token-999"
 
     def test_extract_first_token_if_multiple(self):
         """Test that first token is extracted when multiple exist."""
