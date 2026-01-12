@@ -1,6 +1,7 @@
 """Tests for HTTP-first authentication pattern with browser fallback."""
 
 import pytest
+import requests
 from unittest.mock import Mock, patch, MagicMock
 from qualer_internal_sdk.endpoints.client_dashboard.clients_read import clients_read
 from utils.auth import QualerAPIFetcher
@@ -304,7 +305,6 @@ class TestSyncCookiesFromDriver:
         mock_driver.get_cookies.return_value = [test_cookie]
         
         # Setup session with actual cookie jar to verify attributes
-        import requests
         fetcher.driver = mock_driver
         fetcher.session = requests.Session()
         
@@ -349,7 +349,6 @@ class TestSyncCookiesFromDriver:
         mock_driver.get_cookies.return_value = suffixed_cookies
         
         # Setup session
-        import requests
         fetcher.driver = mock_driver
         fetcher.session = requests.Session()
         
@@ -391,7 +390,6 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        import requests
         fetcher.driver = mock_driver
         fetcher.session = requests.Session()
         
@@ -425,7 +423,6 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        import requests
         fetcher.driver = mock_driver
         fetcher.session = requests.Session()
         
@@ -460,7 +457,6 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        import requests
         fetcher.driver = mock_driver
         fetcher.session = requests.Session()
         
@@ -489,7 +485,6 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        import requests
         fetcher.driver = mock_driver
         fetcher.session = requests.Session()
         
@@ -518,7 +513,6 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        import requests
         fetcher.driver = mock_driver
         fetcher.session = requests.Session()
         
@@ -555,7 +549,6 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        import requests
         fetcher.driver = mock_driver
         fetcher.session = requests.Session()
         
@@ -591,7 +584,6 @@ class TestSyncCookiesFromDriver:
         fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
         
         # Setup with None driver
-        import requests
         fetcher.driver = None
         fetcher.session = requests.Session()
         
