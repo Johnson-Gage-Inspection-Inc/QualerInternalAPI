@@ -185,10 +185,7 @@ When discovering a new endpoint:
 ## Verification Test
 
 ```python
-# Run this to verify HTTP-only authentication works
-import sys
-sys.path.insert(0, r"c:\Users\JeffHall\git\QualerInternalAPI")
-
+# Run this from the project root to verify HTTP-only authentication works
 from qualer_internal_sdk.endpoints.client_dashboard import clients_read
 
 print("Testing HTTP-only authentication...")
