@@ -166,7 +166,8 @@ class QualerAPIFetcher:
         automatically during context manager initialization. Ensure domain/path/secure
         attributes are preserved so cookies are sent on subsequent requests.
 
-        TODO: Add unit test coverage for this method to verify:
+        Unit test coverage is provided in tests/test_http_auth_pattern.py:
+        TestSyncCookiesFromDriver class verifies:
         - Cookies transferred correctly from Selenium to requests.Session
         - Domain/path/secure attributes preserved
         - Works with suffixed cookie names
