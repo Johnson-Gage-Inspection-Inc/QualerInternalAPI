@@ -2,27 +2,30 @@
 
 ## Overview
 
-Qualer's API has **two different authentication patterns** for different endpoint types. Understanding which pattern an endpoint uses is critical for successful implementation.
+Qualer's API endpoints require **browser-like request headers** for authentication beyond just cookies and CSRF tokens. All endpoints can use standard HTTP requests when proper browser fingerprinting headers are included.
 
 ---
 
-## Pattern 1: HTTP-Based (Standard REST API) ✅
+## Authentication Requirements
 
-**Works with**: Direct HTTP requests using `requests.Session`
+**Required Components**:
+1. **Authenticated cookies** - From Selenium login session
+2. **CSRF token** - ASP.NET double-submit pattern (cookie + form field)
+3. **Browser headers** - User-agent, origin, sec-ch-ua family, clientrequesttime
 
 **Methods to use**:
-- `api.session.get()` - Direct HTTP GET
+- `api.session.get()` / `api.session.post()` - Direct HTTP with `api.get_headers()`
 - `api.get()` - HTTP GET with standard headers
 - `api.post()` - HTTP POST with standard headers  
 - `api.fetch()` - HTTP GET with `<pre>` tag JSON extraction
+- `api.fetch_via_browser()` - Fallback for debugging (slower)
 
 **Characteristics**:
-- Standard REST API behavior
-- Accepts authenticated HTTP requests with cookies
-- Returns JSON or HTML-wrapped JSON
-- Fast and efficient
+- Standard REST API behavior with browser-like headers
+- Fast and efficient (no JavaScript execution needed)
+- Validates request origin via headers (not just cookies)
 
-### Known HTTP-Compatible Endpoints
+### Known Endpoints
 
 | Endpoint | Path | Method | Pattern | Notes |
 |----------|------|--------|---------|-------|
@@ -30,12 +33,14 @@ Qualer's API has **two different authentication patterns** for different endpoin
 | **Uncertainty Parameters** | `/work/Uncertainties/UncertaintyParameters` | GET | `session.get()` | Direct JSON response |
 | **Uncertainty Modal** | `/work/Uncertainties/UncertaintyModal` | GET | `session.get()` | Direct JSON response |
 | **Service Groups** | `/work/TaskDetails/GetServiceGroupsForExistingLevels` | GET | `session.get()` | Direct JSON response |
+| **Clients Read** | `/ClientDashboard/Clients_Read` | POST | `clients_read()` | Kendo grid data, requires full headers |
+| **Clients Count** | `/ClientDashboard/ClientsCountView` | GET | Browser required | May work with headers (untested) |
 
 **Implementation Example**:
 ```python
-# Using direct session
-url = "https://jgiquality.qualer.com/work/Uncertainties/UncertaintyParameters"
-response = api.session.get(url, params={"measurementId": 123})
+# Using session with proper headers
+headers = api.get_headers(referer="https://jgiquality.qualer.com/clients")
+response = api.session.post(url, data=payload, headers=headers)
 data = response.json()
 
 # Or using helper with <pre> tag extraction
@@ -44,32 +49,53 @@ api.fetch_and_store(url, "UncertaintyParameters")
 
 ---
 
-## Pattern 2: Browser-Based (JavaScript Required) ⚠️
+## Critical Headers (From HAR Analysis)
 
-**Requires**: JavaScript `fetch()` executed inside authenticated browser context
+The following headers are **required** for POST requests to pass server-side validation:
 
-**Method to use**:
-- `api.fetch_via_browser()` - Injects JavaScript fetch into browser
+```python
+{
+    "accept": "*/*",
+    "accept-encoding": "gzip, deflate, br, zstd",
+    "accept-language": "en-US,en;q=0.9",
+    "cache-control": "no-cache, must-revalidate",
+    "clientrequesttime": "YYYY-MM-DDTHH:MM:SS",  # UTC timestamp (current at request time)
+    "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+    "origin": "https://jgiquality.qualer.com",
+    "pragma": "no-cache",
+    "priority": "u=1, i",
+    "referer": "https://jgiquality.qualer.com/clients",  # Context-specific
+    "sec-ch-ua": '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": '"Windows"',
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...",
+    "x-requested-with": "XMLHttpRequest",
+}
+```
+
+**Key discoveries**:
+- `clientrequesttime` - Must be current UTC timestamp (validated server-side)
+- `origin` - Must match Qualer domain
+- `sec-ch-ua` family - Browser client hints (fingerprinting)
+- `user-agent` - Full Chrome user agent string
+- Missing any of these → 401 Unauthorized
+
+---
+
+## Browser-Based Fallback (Debugging Only) ⚠️
+
+**When to use**: Only if HTTP POST unexpectedly fails or for debugging new endpoints
+
+**Method**: `api.fetch_via_browser()` - Injects JavaScript fetch into browser
 
 **Characteristics**:
-- **Returns 401 with direct HTTP** even with valid cookies/CSRF
-- Validates that request originates from JavaScript in browser
-- Typically internal/undocumented APIs
 - Slower (requires page navigation + JavaScript execution)
-- Used for ClientDashboard and similar internal features
-
-### Known Browser-Required Endpoints
-
-| Endpoint | Path | Method | Auth Page | Notes |
-|----------|------|--------|-----------|-------|
-| **Client Count View** | `/ClientDashboard/ClientsCountView` | GET | `/ClientDashboard/Clients` | Returns client category counts |
-| **Clients Read** | `/ClientDashboard/Clients_Read` | POST | `/clients` | Paginated client list with Kendo Grid format |
-
-**Why does this happen?**
-- These endpoints likely have additional JavaScript-based validation
-- May check for browser context indicators beyond cookies
-- Possibly part of anti-scraping or security measures
-- Internal APIs not designed for direct HTTP consumption
+- Guaranteed to work (uses actual browser context)
+- Useful for debugging when HTTP fails
+- Can capture HAR files to analyze missing headers
 
 **Implementation Example**:
 ```python
@@ -81,9 +107,39 @@ response = api.fetch_via_browser(
         "sort": "ClientCompanyName-asc",
         "page": 1,
         "pageSize": 100,
+        "__RequestVerificationToken": csrf_token,
     }
 )
 ```
+
+---
+
+## How We Discovered This
+
+The breakthrough came from analyzing a Chrome DevTools HAR export:
+
+1. **Captured working request** - Used Chrome DevTools Network tab, exported HAR
+2. **Compared headers** - Identified missing headers in Python `requests` library
+3. **Added browser headers** - Updated `get_headers()` to match browser exactly
+4. **Result**: HTTP POST changed from 401 → 200 ✅
+
+**Key insight**: Qualer validates request origin beyond cookies/CSRF through browser fingerprinting headers (`sec-ch-ua`, `user-agent`, `clientrequesttime`, `origin`).
+
+---
+
+## Decision Flow: Which Pattern to Use?
+
+```
+Is this a POST request to ClientDashboard or similar internal API?
+├─ Yes → Try HTTP POST with api.get_headers() first
+│   ├─ Success (200) → Fast path, continue using HTTP
+│   └─ Fail (401) → Fall back to api.fetch_via_browser()
+│
+└─ No (standard GET endpoint) → Use direct HTTP
+    └─ api.session.get() or api.fetch()
+```
+
+**General Rule**: Always try HTTP-first with proper headers. The browser-based method is now a **debugging tool**, not a primary authentication pattern.
 
 ---
 

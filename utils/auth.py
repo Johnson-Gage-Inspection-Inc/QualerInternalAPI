@@ -1,17 +1,19 @@
 """Authentication utilities for Qualer API access."""
 
+import json
 import os
-from typing import Optional
-import requests
-from time import sleep
+from datetime import datetime, timezone
 from getpass import getpass
+from time import sleep
+from typing import Optional, Tuple
+
+import requests
+from requests.cookies import create_cookie
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from bs4 import BeautifulSoup
-import json
 from dotenv import load_dotenv
-import re
 
 from persistence.storage import StorageAdapter, PostgresRawStorage
 
@@ -149,11 +151,45 @@ class QualerAPIFetcher:
             raise RuntimeError("Login failed. Check your credentials.")
 
     def _build_requests_session(self):
-        """Copy Selenium's cookies into a requests.Session."""
+        """Copy Selenium's cookies into a requests.Session with domain/path."""
         self.session = requests.Session()
         assert self.driver is not None
+        self._sync_cookies_from_driver()
+
+    def _sync_cookies_from_driver(self):
+        """Refresh requests.Session cookies from the current Selenium driver.
+
+        Critical for preserving authentication cookies, especially ASP.NET anti-forgery
+        tokens with suffixed names (e.g., __RequestVerificationToken_L3...).
+
+        Note: This is a private method (_sync_cookies_from_driver) that is called
+        automatically during context manager initialization. Ensure domain/path/secure
+        attributes are preserved so cookies are sent on subsequent requests.
+
+        TODO: Add unit test coverage for this method to verify:
+        - Cookies transferred correctly from Selenium to requests.Session
+        - Domain/path/secure attributes preserved
+        - Works with suffixed cookie names
+        """
+        assert self.session is not None
+        assert self.driver is not None
+
         for cookie in self.driver.get_cookies():
-            self.session.cookies.set(cookie["name"], cookie["value"])
+            # Validate that critical cookie fields are present
+            if not cookie.get("name") or not cookie.get("value"):
+                continue
+
+            # Preserve domain/path so the cookie is actually sent on requests
+            # (requests.Session.set without domain/path can skip sending on some hosts).
+            self.session.cookies.set_cookie(
+                create_cookie(
+                    name=cookie["name"],
+                    value=cookie["value"],
+                    domain=cookie.get("domain"),
+                    path=cookie.get("path", "/"),
+                    secure=cookie.get("secure", False),
+                )
+            )
 
     def get_headers(self, referer: Optional[str] = None, **overrides) -> dict:
         """
@@ -182,14 +218,25 @@ class QualerAPIFetcher:
             else:
                 referer = "https://jgiquality.qualer.com/"
 
-        # Standard headers for Qualer API requests
+        # Standard headers for Qualer API requests (matching browser)
+        # Based on HAR capture from successful Clients_Read POST
         headers = {
             "accept": "*/*",
             "accept-encoding": "gzip, deflate, br, zstd",
             "accept-language": "en-US,en;q=0.9",
             "cache-control": "no-cache, must-revalidate",
+            "clientrequesttime": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+            "origin": "https://jgiquality.qualer.com",
             "pragma": "no-cache",
+            "priority": "u=1, i",
             "referer": referer,
+            "sec-ch-ua": '"Google Chrome";v="120", "Chromium";v="120", "Not A(Brand";v="24"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"Windows"',
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         }
 
         # Convert underscore keys to hyphenated headers
@@ -424,45 +471,22 @@ class QualerAPIFetcher:
         new_response.request = r.request
         return new_response
 
-    def extract_csrf_token(self, html: str) -> str:
-        """
-        Extract CSRF token from HTML page.
-
-        Searches for __RequestVerificationToken in hidden input fields.
-
-        Args:
-            html: HTML content to search
-
-        Returns:
-            The CSRF token value
-
-        Raises:
-            ValueError: If token cannot be found in HTML
-        """
-        # Look for __RequestVerificationToken in hidden input
-        # Pattern allows for attributes like type="hidden" between name and value
-        match = re.search(r'name="__RequestVerificationToken"[^>]*value="([^"]+)"', html)
-        if match:
-            return match.group(1)
-
-        # Try alternate pattern (value before name)
-        match = re.search(r'value="([^"]+)"[^>]*name="__RequestVerificationToken"', html)
-        if match:
-            return match.group(1)
-
-        # Debug: print a snippet of the HTML
-        print("DEBUG: Could not find token. Checking page structure...")
-        if "__RequestVerificationToken" in html:
-            # Find context around the token
-            idx = html.find("__RequestVerificationToken")
-            snippet = html[max(0, idx - 100) : idx + 200]
-            print(f"Found token reference at:\n{snippet}\n")
-        else:
-            print("Token name not found in HTML at all")
-            # Print first 2000 chars to see structure
-            print(f"HTML snippet:\n{html[:2000]}\n")
+    def extract_csrf_field(self, html: str) -> Tuple[str, str]:
+        """Return (token_name, token_value) for the first CSRF input."""
+        soup = BeautifulSoup(html, "html.parser")
+        for input_tag in soup.find_all("input"):
+            name = input_tag.get("name")
+            if isinstance(name, str) and name.startswith("__RequestVerificationToken"):
+                value = input_tag.get("value")
+                if isinstance(value, str) and value:
+                    return name, value
 
         raise ValueError("Could not find CSRF token in page")
+
+    def extract_csrf_token(self, html: str) -> str:
+        """Backwards-compatible helper: return only the token value."""
+        _, token = self.extract_csrf_field(html)
+        return token
 
     def _generate_browser_fetch_js(self, method: str, url: str, body: Optional[str] = None) -> str:
         """
@@ -587,8 +611,8 @@ class QualerAPIFetcher:
         # Add CSRF token for POST requests
         if include_csrf and method.upper() == "POST":
             try:
-                csrf_token = self.extract_csrf_token(self.driver.page_source)
-                params["__RequestVerificationToken"] = csrf_token
+                token_name, csrf_token = self.extract_csrf_field(self.driver.page_source)
+                params[token_name] = csrf_token
             except ValueError:
                 # Token not found - some endpoints may not require it
                 # or it may be injected differently. Proceed without it.

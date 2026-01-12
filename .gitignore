@@ -7,3 +7,5 @@ local/
 *.csv
 *.json
 temp.*
+examples/*.ps1
+examples/*.har
