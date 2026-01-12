@@ -65,7 +65,7 @@ The following headers are **required** for POST requests to pass server-side val
     "pragma": "no-cache",
     "priority": "u=1, i",
     "referer": "https://jgiquality.qualer.com/clients",  # Context-specific
-    "sec-ch-ua": '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand\";v=\"24\"',
+    "sec-ch-ua": '"Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"',
     "sec-ch-ua-mobile": "?0",
     "sec-ch-ua-platform": '"Windows"',
     "sec-fetch-dest": "empty",
