@@ -2,7 +2,7 @@
 
 import pytest
 import requests
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from qualer_internal_sdk.endpoints.client_dashboard.clients_read import clients_read
 from utils.auth import QualerAPIFetcher
 
@@ -31,6 +31,12 @@ def mock_driver():
         </html>
     """
     return driver
+
+
+@pytest.fixture
+def uninitialized_fetcher():
+    """Create an uninitialized QualerAPIFetcher instance for testing internal methods."""
+    return QualerAPIFetcher.__new__(QualerAPIFetcher)
 
 
 class TestClientsReadHTTPFirst:
@@ -253,11 +259,8 @@ class TestCookieSyncErrors:
 class TestSyncCookiesFromDriver:
     """Test cases for _sync_cookies_from_driver method."""
 
-    def test_basic_cookie_transfer(self):
+    def test_basic_cookie_transfer(self, uninitialized_fetcher):
         """Test that cookies are transferred correctly from Selenium to requests.Session."""
-        # Create a fetcher instance without full initialization
-        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        
         # Setup mock driver with basic cookies
         mock_driver = Mock()
         mock_driver.get_cookies.return_value = [
@@ -278,21 +281,18 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        fetcher.driver = mock_driver
-        fetcher.session = Mock()
-        fetcher.session.cookies = Mock()
+        uninitialized_fetcher.driver = mock_driver
+        uninitialized_fetcher.session = Mock()
+        uninitialized_fetcher.session.cookies = Mock()
         
         # Execute
-        fetcher._sync_cookies_from_driver()
+        uninitialized_fetcher._sync_cookies_from_driver()
         
         # Verify cookies were set
-        assert fetcher.session.cookies.set_cookie.call_count == 2
+        assert uninitialized_fetcher.session.cookies.set_cookie.call_count == 2
 
-    def test_domain_path_secure_attributes_preserved(self):
+    def test_domain_path_secure_attributes_preserved(self, uninitialized_fetcher):
         """Test that domain, path, and secure attributes are preserved during transfer."""
-        # Create a fetcher instance
-        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        
         # Setup mock driver with cookie having specific attributes
         mock_driver = Mock()
         test_cookie = {
@@ -305,14 +305,14 @@ class TestSyncCookiesFromDriver:
         mock_driver.get_cookies.return_value = [test_cookie]
         
         # Setup session with actual cookie jar to verify attributes
-        fetcher.driver = mock_driver
-        fetcher.session = requests.Session()
+        uninitialized_fetcher.driver = mock_driver
+        uninitialized_fetcher.session = requests.Session()
         
         # Execute
-        fetcher._sync_cookies_from_driver()
+        uninitialized_fetcher._sync_cookies_from_driver()
         
         # Verify cookie was added to session
-        cookies = list(fetcher.session.cookies)
+        cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
         
         # Verify attributes are preserved
@@ -323,11 +323,8 @@ class TestSyncCookiesFromDriver:
         assert cookie.path == "/clients"
         assert cookie.secure is True
 
-    def test_suffixed_cookie_names(self):
+    def test_suffixed_cookie_names(self, uninitialized_fetcher):
         """Test that cookies with suffixed names (e.g., __RequestVerificationToken_L3...) work correctly."""
-        # Create a fetcher instance
-        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        
         # Setup mock driver with suffixed cookie name (ASP.NET anti-forgery pattern)
         mock_driver = Mock()
         suffixed_cookies = [
@@ -349,14 +346,14 @@ class TestSyncCookiesFromDriver:
         mock_driver.get_cookies.return_value = suffixed_cookies
         
         # Setup session
-        fetcher.driver = mock_driver
-        fetcher.session = requests.Session()
+        uninitialized_fetcher.driver = mock_driver
+        uninitialized_fetcher.session = requests.Session()
         
         # Execute
-        fetcher._sync_cookies_from_driver()
+        uninitialized_fetcher._sync_cookies_from_driver()
         
         # Verify both cookies were added
-        cookies = list(fetcher.session.cookies)
+        cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 2
         
         # Verify suffixed cookie is present with correct value
@@ -368,11 +365,8 @@ class TestSyncCookiesFromDriver:
         assert suffixed_cookie.value == "suffixed_token_value_CfDJ8ABC123"
         assert suffixed_cookie.path == "/shared-secured"
 
-    def test_cookies_missing_name_are_skipped(self):
+    def test_cookies_missing_name_are_skipped(self, uninitialized_fetcher):
         """Test that cookies without a name are skipped gracefully."""
-        # Create a fetcher instance
-        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        
         # Setup mock driver with malformed cookie (missing name)
         mock_driver = Mock()
         mock_driver.get_cookies.return_value = [
@@ -390,22 +384,19 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        fetcher.driver = mock_driver
-        fetcher.session = requests.Session()
+        uninitialized_fetcher.driver = mock_driver
+        uninitialized_fetcher.session = requests.Session()
         
         # Execute - should not raise error
-        fetcher._sync_cookies_from_driver()
+        uninitialized_fetcher._sync_cookies_from_driver()
         
         # Verify only valid cookie was added
-        cookies = list(fetcher.session.cookies)
+        cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
         assert cookies[0].name == "valid_cookie"
 
-    def test_cookies_missing_value_are_skipped(self):
+    def test_cookies_missing_value_are_skipped(self, uninitialized_fetcher):
         """Test that cookies without a value are skipped gracefully."""
-        # Create a fetcher instance
-        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        
         # Setup mock driver with malformed cookie (missing value)
         mock_driver = Mock()
         mock_driver.get_cookies.return_value = [
@@ -423,22 +414,19 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        fetcher.driver = mock_driver
-        fetcher.session = requests.Session()
+        uninitialized_fetcher.driver = mock_driver
+        uninitialized_fetcher.session = requests.Session()
         
         # Execute - should not raise error
-        fetcher._sync_cookies_from_driver()
+        uninitialized_fetcher._sync_cookies_from_driver()
         
         # Verify only valid cookie was added
-        cookies = list(fetcher.session.cookies)
+        cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
         assert cookies[0].name == "valid_cookie"
 
-    def test_cookies_with_empty_string_name_are_skipped(self):
+    def test_cookies_with_empty_string_name_are_skipped(self, uninitialized_fetcher):
         """Test that cookies with empty string name are skipped."""
-        # Create a fetcher instance
-        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        
         # Setup mock driver with cookie having empty name
         mock_driver = Mock()
         mock_driver.get_cookies.return_value = [
@@ -457,22 +445,19 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        fetcher.driver = mock_driver
-        fetcher.session = requests.Session()
+        uninitialized_fetcher.driver = mock_driver
+        uninitialized_fetcher.session = requests.Session()
         
         # Execute
-        fetcher._sync_cookies_from_driver()
+        uninitialized_fetcher._sync_cookies_from_driver()
         
         # Verify only valid cookie was added
-        cookies = list(fetcher.session.cookies)
+        cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
         assert cookies[0].name == "valid_cookie"
 
-    def test_default_path_applied_when_missing(self):
+    def test_default_path_applied_when_missing(self, uninitialized_fetcher):
         """Test that path defaults to '/' when not provided by driver."""
-        # Create a fetcher instance
-        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        
         # Setup mock driver with cookie missing path attribute
         mock_driver = Mock()
         mock_driver.get_cookies.return_value = [
@@ -485,22 +470,19 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        fetcher.driver = mock_driver
-        fetcher.session = requests.Session()
+        uninitialized_fetcher.driver = mock_driver
+        uninitialized_fetcher.session = requests.Session()
         
         # Execute
-        fetcher._sync_cookies_from_driver()
+        uninitialized_fetcher._sync_cookies_from_driver()
         
         # Verify cookie was added with default path
-        cookies = list(fetcher.session.cookies)
+        cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
         assert cookies[0].path == "/"
 
-    def test_default_secure_false_when_missing(self):
+    def test_default_secure_false_when_missing(self, uninitialized_fetcher):
         """Test that secure defaults to False when not provided by driver."""
-        # Create a fetcher instance
-        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        
         # Setup mock driver with cookie missing secure attribute
         mock_driver = Mock()
         mock_driver.get_cookies.return_value = [
@@ -513,22 +495,19 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        fetcher.driver = mock_driver
-        fetcher.session = requests.Session()
+        uninitialized_fetcher.driver = mock_driver
+        uninitialized_fetcher.session = requests.Session()
         
         # Execute
-        fetcher._sync_cookies_from_driver()
+        uninitialized_fetcher._sync_cookies_from_driver()
         
         # Verify cookie was added with default secure=False
-        cookies = list(fetcher.session.cookies)
+        cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
         assert cookies[0].secure is False
 
-    def test_multiple_cookies_with_different_domains(self):
+    def test_multiple_cookies_with_different_domains(self, uninitialized_fetcher):
         """Test handling of multiple cookies with different domain attributes."""
-        # Create a fetcher instance
-        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        
         # Setup mock driver with cookies from different domains
         mock_driver = Mock()
         mock_driver.get_cookies.return_value = [
@@ -549,44 +528,38 @@ class TestSyncCookiesFromDriver:
         ]
         
         # Setup session
-        fetcher.driver = mock_driver
-        fetcher.session = requests.Session()
+        uninitialized_fetcher.driver = mock_driver
+        uninitialized_fetcher.session = requests.Session()
         
         # Execute
-        fetcher._sync_cookies_from_driver()
+        uninitialized_fetcher._sync_cookies_from_driver()
         
         # Verify both cookies were added with correct domains
-        cookies = list(fetcher.session.cookies)
+        cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 2
         
         domains = [c.domain for c in cookies]
         assert ".qualer.com" in domains
         assert ".jgiquality.qualer.com" in domains
 
-    def test_assertion_error_when_session_is_none(self):
+    def test_assertion_error_when_session_is_none(self, uninitialized_fetcher):
         """Test that assertion fails when session is None."""
-        # Create a fetcher instance
-        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        
         # Setup with None session
         mock_driver = Mock()
         mock_driver.get_cookies.return_value = []
-        fetcher.driver = mock_driver
-        fetcher.session = None
+        uninitialized_fetcher.driver = mock_driver
+        uninitialized_fetcher.session = None
         
         # Execute and verify assertion error
         with pytest.raises(AssertionError):
-            fetcher._sync_cookies_from_driver()
+            uninitialized_fetcher._sync_cookies_from_driver()
 
-    def test_assertion_error_when_driver_is_none(self):
+    def test_assertion_error_when_driver_is_none(self, uninitialized_fetcher):
         """Test that assertion fails when driver is None."""
-        # Create a fetcher instance
-        fetcher = QualerAPIFetcher.__new__(QualerAPIFetcher)
-        
         # Setup with None driver
-        fetcher.driver = None
-        fetcher.session = requests.Session()
+        uninitialized_fetcher.driver = None
+        uninitialized_fetcher.session = requests.Session()
         
         # Execute and verify assertion error
         with pytest.raises(AssertionError):
-            fetcher._sync_cookies_from_driver()
+            uninitialized_fetcher._sync_cookies_from_driver()
