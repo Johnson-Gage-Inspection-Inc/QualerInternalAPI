@@ -1,7 +1,7 @@
 """Tests for HTTP-first authentication pattern with browser fallback."""
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 from qualer_internal_sdk.endpoints.client_dashboard.clients_read import clients_read
 
 
@@ -34,14 +34,26 @@ def mock_driver():
 class TestClientsReadHTTPFirst:
     """Test cases for clients_read HTTP-first authentication pattern."""
 
-    @patch("utils.auth.QualerAPIFetcher")
-    def test_http_post_success(self, mock_fetcher_class, mock_qualer_api_fetcher, mock_driver):
+    @patch("qualer_internal_sdk.endpoints.client_dashboard.clients_read.QualerAPIFetcher")
+    @patch("qualer_internal_sdk.endpoints.client_dashboard.clients_read.sleep")
+    def test_http_post_success(self, mock_sleep, mock_fetcher_class):
         """Test successful HTTP POST without fallback."""
-        # Setup
-        mock_fetcher_class.return_value = mock_qualer_api_fetcher
-        mock_qualer_api_fetcher.driver = mock_driver
-        mock_qualer_api_fetcher.extract_csrf_token.return_value = "test_csrf_token"
-        mock_qualer_api_fetcher.get_headers.return_value = {
+        # Setup mock fetcher instance
+        mock_fetcher = MagicMock()
+        mock_fetcher.__enter__.return_value = mock_fetcher
+        mock_fetcher.__exit__.return_value = False
+
+        # Setup driver
+        mock_fetcher.driver = Mock()
+        mock_fetcher.driver.page_source = (
+            '<input name="__RequestVerificationToken" value="test_token"/>'
+        )
+
+        # Setup CSRF extraction
+        mock_fetcher.extract_csrf_token.return_value = "test_csrf_token"
+
+        # Setup headers
+        mock_fetcher.get_headers.return_value = {
             "referer": "https://jgiquality.qualer.com/clients",
             "x-requested-with": "XMLHttpRequest",
         }
@@ -59,7 +71,10 @@ class TestClientsReadHTTPFirst:
             ],
             "Total": 1,
         }
-        mock_qualer_api_fetcher.session.post.return_value = mock_response
+        mock_fetcher.session = Mock()
+        mock_fetcher.session.post.return_value = mock_response
+
+        mock_fetcher_class.return_value = mock_fetcher
 
         # Execute
         result = clients_read(page_size=10)
@@ -67,8 +82,8 @@ class TestClientsReadHTTPFirst:
         # Verify
         assert result["Data"][0]["ClientCompanyName"] == "Test Company"
         assert result["Total"] == 1
-        mock_qualer_api_fetcher.session.post.assert_called_once()
-        mock_qualer_api_fetcher.fetch_via_browser.assert_not_called()
+        mock_fetcher.session.post.assert_called_once()
+        mock_fetcher.fetch_via_browser.assert_not_called()
 
     @patch("utils.auth.QualerAPIFetcher")
     def test_http_post_fallback_on_error(
