@@ -1,8 +1,10 @@
 """Tests for HTTP-first authentication pattern with browser fallback."""
 
 import pytest
-import requests
 from unittest.mock import Mock, patch
+
+import requests
+
 from qualer_internal_sdk.endpoints.client_dashboard.clients_read import clients_read
 from utils.auth import QualerAPIFetcher
 
@@ -279,15 +281,15 @@ class TestSyncCookiesFromDriver:
                 "secure": False,
             },
         ]
-        
+
         # Setup session
         uninitialized_fetcher.driver = mock_driver
         uninitialized_fetcher.session = Mock()
         uninitialized_fetcher.session.cookies = Mock()
-        
+
         # Execute
         uninitialized_fetcher._sync_cookies_from_driver()
-        
+
         # Verify cookies were set
         assert uninitialized_fetcher.session.cookies.set_cookie.call_count == 2
 
@@ -303,18 +305,18 @@ class TestSyncCookiesFromDriver:
             "secure": True,
         }
         mock_driver.get_cookies.return_value = [test_cookie]
-        
+
         # Setup session with actual cookie jar to verify attributes
         uninitialized_fetcher.driver = mock_driver
         uninitialized_fetcher.session = requests.Session()
-        
+
         # Execute
         uninitialized_fetcher._sync_cookies_from_driver()
-        
+
         # Verify cookie was added to session
         cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
-        
+
         # Verify attributes are preserved
         cookie = cookies[0]
         assert cookie.name == "auth_cookie"
@@ -344,18 +346,18 @@ class TestSyncCookiesFromDriver:
             },
         ]
         mock_driver.get_cookies.return_value = suffixed_cookies
-        
+
         # Setup session
         uninitialized_fetcher.driver = mock_driver
         uninitialized_fetcher.session = requests.Session()
-        
+
         # Execute
         uninitialized_fetcher._sync_cookies_from_driver()
-        
+
         # Verify both cookies were added
         cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 2
-        
+
         # Verify suffixed cookie is present with correct value
         suffixed_cookie = next(
             (c for c in cookies if c.name.startswith("__RequestVerificationToken_")),
@@ -382,14 +384,14 @@ class TestSyncCookiesFromDriver:
                 "path": "/",
             },
         ]
-        
+
         # Setup session
         uninitialized_fetcher.driver = mock_driver
         uninitialized_fetcher.session = requests.Session()
-        
+
         # Execute - should not raise error
         uninitialized_fetcher._sync_cookies_from_driver()
-        
+
         # Verify only valid cookie was added
         cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
@@ -412,14 +414,14 @@ class TestSyncCookiesFromDriver:
                 "path": "/",
             },
         ]
-        
+
         # Setup session
         uninitialized_fetcher.driver = mock_driver
         uninitialized_fetcher.session = requests.Session()
-        
+
         # Execute - should not raise error
         uninitialized_fetcher._sync_cookies_from_driver()
-        
+
         # Verify only valid cookie was added
         cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
@@ -443,14 +445,14 @@ class TestSyncCookiesFromDriver:
                 "path": "/",
             },
         ]
-        
+
         # Setup session
         uninitialized_fetcher.driver = mock_driver
         uninitialized_fetcher.session = requests.Session()
-        
+
         # Execute
         uninitialized_fetcher._sync_cookies_from_driver()
-        
+
         # Verify only valid cookie was added
         cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
@@ -468,14 +470,14 @@ class TestSyncCookiesFromDriver:
                 "secure": False,
             }
         ]
-        
+
         # Setup session
         uninitialized_fetcher.driver = mock_driver
         uninitialized_fetcher.session = requests.Session()
-        
+
         # Execute
         uninitialized_fetcher._sync_cookies_from_driver()
-        
+
         # Verify cookie was added with default path
         cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
@@ -493,14 +495,14 @@ class TestSyncCookiesFromDriver:
                 "path": "/",
             }
         ]
-        
+
         # Setup session
         uninitialized_fetcher.driver = mock_driver
         uninitialized_fetcher.session = requests.Session()
-        
+
         # Execute
         uninitialized_fetcher._sync_cookies_from_driver()
-        
+
         # Verify cookie was added with default secure=False
         cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 1
@@ -526,18 +528,18 @@ class TestSyncCookiesFromDriver:
                 "secure": True,
             },
         ]
-        
+
         # Setup session
         uninitialized_fetcher.driver = mock_driver
         uninitialized_fetcher.session = requests.Session()
-        
+
         # Execute
         uninitialized_fetcher._sync_cookies_from_driver()
-        
+
         # Verify both cookies were added with correct domains
         cookies = list(uninitialized_fetcher.session.cookies)
         assert len(cookies) == 2
-        
+
         domains = [c.domain for c in cookies]
         assert ".qualer.com" in domains
         assert ".jgiquality.qualer.com" in domains
@@ -549,7 +551,7 @@ class TestSyncCookiesFromDriver:
         mock_driver.get_cookies.return_value = []
         uninitialized_fetcher.driver = mock_driver
         uninitialized_fetcher.session = None
-        
+
         # Execute and verify assertion error
         with pytest.raises(AssertionError):
             uninitialized_fetcher._sync_cookies_from_driver()
@@ -559,7 +561,7 @@ class TestSyncCookiesFromDriver:
         # Setup with None driver
         uninitialized_fetcher.driver = None
         uninitialized_fetcher.session = requests.Session()
-        
+
         # Execute and verify assertion error
         with pytest.raises(AssertionError):
             uninitialized_fetcher._sync_cookies_from_driver()
