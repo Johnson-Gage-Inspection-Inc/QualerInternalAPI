@@ -6,10 +6,23 @@ re-exported here via ``__all__`` when they are considered stable.
 """
 
 from .service_groups import ServiceGroupsEndpoint
-from .service_measurements import get_service_measurements, get_all_measurements_for_groups
+from .service_measurements import (
+    get_service_measurements,
+    get_all_measurements_for_groups,
+    ServiceMeasurement,
+)
+from .service_level_parameters import (
+    get_service_level_parameters,
+    get_all_parameters_for_groups,
+    ServiceLevelParameter,
+)
 
 __all__ = [
     "ServiceGroupsEndpoint",
     "get_service_measurements",
     "get_all_measurements_for_groups",
+    "ServiceMeasurement",
+    "get_service_level_parameters",
+    "get_all_parameters_for_groups",
+    "ServiceLevelParameter",
 ]
